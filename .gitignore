@@ -1,0 +1,6 @@
+__pycache__/
+.vscode
+maestro_v2_tokens/
+corpus-def
+maestro-v2.0.0/
+magenta-main/

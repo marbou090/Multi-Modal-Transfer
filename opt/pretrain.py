@@ -12,6 +12,8 @@ from paths import project_base_path
 from training import model
 from training.utils import batchify, get_batch, repackage_hidden, get_slice
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Language Model')
 ########
 # Arguments we actually use in our experiments.

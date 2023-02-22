@@ -4,6 +4,7 @@ import argparse
 import os
 import pickle
 import torch
+import numpy as np
 
 import sys
 this_file_path = os.path.join(os.getcwd(), __file__)
@@ -22,7 +23,7 @@ parser.add_argument('--reading-type', type=str, default="language", choices=("la
 def main(args):
     corpus = Corpus()
     corpus.train = tokenize(corpus, args.path + 'train', args.reading_type)
-    corpus.valid = tokenize(corpus, args.path + 'val', args.reading_type)
+    corpus.valid = tokenize(corpus, args.path + 'validation', args.reading_type)
     corpus.test = tokenize(corpus, args.path + 'test', args.reading_type)
     torch.save(corpus, os.path.join(project_path, "corpora", "pickled_files", f"corpus-{args.name}"))
     print("Finished and saved!")
@@ -38,6 +39,7 @@ def tokenize(corpus, path, reading_type):
 
 def lang_tokenize(corpus, path):
     """Tokenizes a text file."""
+    print(path)
     assert os.path.exists(path)
     # Add words to the dictionary
     with open(path, 'r') as f:
