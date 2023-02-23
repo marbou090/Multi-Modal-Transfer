@@ -138,8 +138,6 @@ soundfile==0.12.1
 sox==1.4.1
 sqlparse==0.4.3
 sympy==1.10.1
-# Editable install with no version control (tensor2tensor==1.15.7)
--e /working/tensor2tensor-master/tensor2tensor-master
 tensorboard==1.15.0
 tensorflow==1.15.0
 tensorflow-addons==0.19.0

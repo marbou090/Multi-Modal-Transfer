@@ -4,3 +4,7 @@ maestro_v2_tokens/
 corpus-def
 maestro-v2.0.0/
 magenta-main/
+*.zip
+pretrained_models/
+tensor2tensor-master
+pickled_files/

@@ -7,13 +7,14 @@ import torch.nn as nn
 import os
 import hashlib
 import pickle
+import json
 
 import training.model
 from training.splitcross import SplitCrossEntropyLoss
 
 from training.utils import batchify, get_batch, repackage_hidden, get_slice
 
-args = pickle.load(open("/u/scr/isabelvp/multilingual-transfer/save/default-args", "rb"))
+args = torch.load(("opt/default-args")) #ここにargsのデータの居場所を置く
 #args.log_interval = 50
 #args.valid_interval = 50
 args.log_interval = 200

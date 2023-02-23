@@ -31,8 +31,8 @@ def run():
     possible_pretrains = \
         ["pt", "ja", "code", "music", "unigram", "random", "es", "en", "ru", \
         "random310", "repetition", "paren", "paren-zipf", "valence", "de", "eu", \
-        "fi", "ro", "tr", "it", "ko", "fa"]
-    assert args.pretrain in possible_pretrains
+        "fi", "ro", "tr", "it", "ko", "def"]
+    #assert args.pretrain in possible_pretrains
 
     pretrain_type = args.pretrain if args.pretrain in ["music", "code"] else "language"
     pretrain_path = os.path.join(project_base_path, "models", "pretrained_models", args.pretrain)
@@ -97,11 +97,13 @@ def run():
         pickle.dump(results, open(save_path, "wb"))
 
 def load_corpus(data_path, cull_vocab=True, shuffle_vocab=False):
+    """
     if cull_vocab:
         data_path = data_path + ".cull"
     if shuffle_vocab:
         assert cull_vocab, "Usually don't have unculled shuffled corpora"
         data_path = data_path + "-shuf"
+        """
     corpus = torch.load(data_path)
     return corpus
 

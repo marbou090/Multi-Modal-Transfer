@@ -5,6 +5,7 @@ import math
 import numpy as np
 import os
 import torch
+import json
 import torch.nn as nn
 
 from corpora import data
@@ -12,7 +13,7 @@ from paths import project_base_path
 from training import model
 from training.utils import batchify, get_batch, repackage_hidden, get_slice
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 
 parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Language Model')
 ########
@@ -138,6 +139,12 @@ if args.save is not "":
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
 save_fn = os.path.join(save_dir, f"trial{args.trial}")
+"""
+if os.path.exists(save_fn):
+    print("trained before")
+    import sys
+    sys.exit(0)
+    """
 import os
 import hashlib
 
@@ -300,6 +307,7 @@ def train():
             valid_time = time.time()
             if val_loss < stored_loss:
                 model_save(save_fn)
+                
                 print('Saving model (new best validation)')
                 stored_loss = val_loss
             best_val_loss.append(val_loss)
