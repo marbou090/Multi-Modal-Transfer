@@ -3,7 +3,7 @@ from csv import DictReader
 import os
 
 split_to_midi_fps = defaultdict(list)
-with open('maestro-v2.0.0/maestro-v2.0.0.csv', 'r') as f:
+with open('/content/tilt-transfer/opt/maestro-v2.0.0/maestro-v2.0.0.csv', 'r') as f:
   reader = DictReader(f)
   for r in reader:
     split_to_midi_fps[r['split']].append(os.path.join('maestro-v2.0.0', r['midi_filename']))
