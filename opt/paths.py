@@ -1,1 +1,1 @@
-project_base_path = "/working"
+project_base_path = ""
