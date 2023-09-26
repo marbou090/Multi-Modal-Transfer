@@ -14,7 +14,7 @@ from training.splitcross import SplitCrossEntropyLoss
 
 from training.utils import batchify, get_batch, repackage_hidden, get_slice
 
-args = torch.load(("opt/default-args")) #ここにargsのデータの居場所を置く
+args = torch.load(("./args")) #ここにargsのデータの居場所を置く
 #args.log_interval = 50
 #args.valid_interval = 50
 args.log_interval = 200
@@ -28,8 +28,10 @@ best_loss = 100000000
 best_model = None
 last_train_loss = -1
 
+torch.backends.cudnn.enabled = False
+
 def l2_train(data, pret_model, pret_criterion, l1_test, seed,
-                  freeze_net=False, start_lr=30, check_epoch=20, lr_patience=5,
+                  freeze_net=False, start_lr=30, check_epoch=5, lr_patience=5,
                   max_lr_decreases=5, cull_vocab=True, corpus_change="nothing"):
     global model, criterion, optimizer, scheduler, params
     np.random.seed(seed)

@@ -13,10 +13,11 @@ from training.utils import batchify, get_batch, repackage_hidden, get_slice
 parser = argparse.ArgumentParser()
 parser.add_argument('--pretrain', type=str, help="Which pretrained model, look at possible_pretrains for the options")
 parser.add_argument('--run-name', type=str, default="last_run", help="How to call the save file for this run, within the results dir of this pretrain type")
-parser.add_argument("--finetune", type=str, default="es", help="What kind of L2 data to train on. Will assume that it exists in a shuffled vocab corpus")
+parser.add_argument("--finetuneType", type=str, default="es", help="What kind of L2 data to train on. Will assume that it exists in a shuffled vocab corpus")
 parser.add_argument('--trials', nargs="+", type=int, default=[0, 5],
                     help='Lowest and highest trial num (of pretrained models)')
 parser.add_argument('--seed', type=int, default=4, help="Seed will be args.seed*100 + the pretrain_index")
+parser.add_argument('--finetuneFile', type=str,help="Which L2 corpus")
 args = parser.parse_args()
 args.cuda = True
 print(args)
@@ -43,8 +44,8 @@ def run():
     save_path = os.path.join(save_dir, args.run_name)
     print(f"Will save to {save_path}")
 
-    l2_data_type = args.finetune if args.finetune in ["music", "code"] else "language"
-    l2_data_location = os.path.join(project_base_path, "corpora", "pickled_files", f"corpus-{args.finetune}")
+    l2_data_type = args.finetuneType if args.finetuneType in ["music", "code"] else "language"
+    l2_data_location = os.path.join(project_base_path, "corpora", "pickled_files", f"corpus-{args.finetuneFile}")
     corpus = load_corpus(l2_data_location, l2_data_type, shuffle_vocab=True)
     train_data = batchify(corpus.train, batch_size, args)
     val_data = batchify(corpus.valid, eval_batch_size, args)
