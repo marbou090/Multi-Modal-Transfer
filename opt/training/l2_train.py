@@ -14,6 +14,8 @@ from training.splitcross import SplitCrossEntropyLoss
 
 from training.utils import batchify, get_batch, repackage_hidden, get_slice
 
+from paths import project_base_path
+
 args = torch.load(("./args")) #ここにargsのデータの居場所を置く
 #args.log_interval = 50
 #args.valid_interval = 50
@@ -29,9 +31,12 @@ best_model = None
 last_train_loss = -1
 
 
-def l2_train(data, pret_model, pret_criterion, l1_test, seed,
+def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_path,
                   freeze_net=False, start_lr=30, check_epoch=5, lr_patience=5,
                   max_lr_decreases=1, cull_vocab=True, corpus_change="nothing"):
+
+    save_path = os.path.join(save_dir, args.run_name, '-finetune')
+
     global model, criterion, optimizer, scheduler, params
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -62,12 +67,26 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,
     overall_batch, epoch_batch, epoch_data_index = 0, 0, 0
     valid_time = time.time()
     stop_condition_met = False
+
+    if os.path.exists(save_path):
+        print(f"Model already fintuned! Resuming from {save_path}")
+        model_load(save_path)
+        model.cuda()
+        test_loss = evaluate(model, criterion, test_data, test_batch_size)
+        l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
+        return val_loss_list, test_loss, last_train_loss, overall_batch, epoch, \
+           loss_at_epoch, test_loss_at_epoch, train_loss_at_epoch, \
+           zero_shot_test, l1_test_loss, embeddings
+
+    ##########################################################################
+    #fintuning
+    ##########################################################################
     while not stop_condition_met:
         epoch_start_time = time.time()
         overall_batch, num_lr_decreases = \
             train(model, criterion, train_data, val_data, overall_batch,
-                  epoch_batch, epoch_data_index, valid_time, val_loss_list,
-                  scheduler, num_lr_decreases)
+                epoch_batch, epoch_data_index, valid_time, val_loss_list,
+                scheduler, num_lr_decreases)
         epoch_batch, epoch_data_index = 0, 0
         epoch += 1
         #########################
@@ -83,7 +102,10 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,
             loss_at_epoch = evaluate(model, criterion, val_data, eval_batch_size)
             test_loss_at_epoch = evaluate(model, criterion, test_data, test_batch_size)
             print(f"Loss {loss_at_epoch}, test loss {test_loss_at_epoch}")
-            
+
+    print(f"Saving model to {save_path} ")
+    model_save(save_path)
+
     test_loss = evaluate(model, criterion, test_data, test_batch_size)
     l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
     #NOTE this assumes that weights are tied, which they have been for all the
@@ -92,12 +114,18 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,
     return val_loss_list, test_loss, last_train_loss, overall_batch, epoch, \
            loss_at_epoch, test_loss_at_epoch, train_loss_at_epoch, \
            zero_shot_test, l1_test_loss, embeddings
-                    
+
+def model_load(fn):
+    global model, criterion, optimizer, scheduler, run_data
+    with open(fn, 'rb') as f:
+        model, criterion, optimizer, scheduler, run_data = torch.load(f)
+
 def model_save(fn):
     with open(fn, 'wb') as f:
         torch.save([model, criterion, optimizer, scheduler,
                     (epoch, num_lr_decreases, lr, best_loss, val_loss_list,
-                     overall_batch, epoch_batch, epoch_data_index)],
+                     overall_batch, epoch_batch, epoch_data_index,loss_at_epoch,test_loss_at_epoch,train_loss_at_epoch,
+                     zero_shot_test,embeddings)],
                    f)
 ###############################################################################
 # Training code

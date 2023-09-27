@@ -80,7 +80,7 @@ def run():
         loss_at_epoch, test_loss_at_epoch, train_loss_at_epoch, zero_shot_test, \
         l1_test_loss, embeddings = \
             l2_train((train_data, val_data, test_data),  model, criterion, 
-                     l1_test, seed, freeze_net=True, check_epoch=1)
+                     l1_test, seed, save_path=save_path,freeze_net=True, check_epoch=1)
         results["frozen"].append(True)
         results["pretrain"].append(args.pretrain)
         results["pretrain_trial"].append(trial)
