@@ -31,11 +31,12 @@ best_model = None
 last_train_loss = -1
 
 
-def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_path,
+def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_path, run_name,
                   freeze_net=False, start_lr=30, check_epoch=5, lr_patience=5,
                   max_lr_decreases=1, cull_vocab=True, corpus_change="nothing"):
 
-    save_path = os.path.join(save_dir, args.run_name, '-finetune')
+    save_path = os.path.join(save_path, run_name, '-finetune')
+    print(f"Finetuned model will save to {save_path}")
 
     global model, criterion, optimizer, scheduler, params
     np.random.seed(seed)
