@@ -28,11 +28,10 @@ best_loss = 100000000
 best_model = None
 last_train_loss = -1
 
-torch.backends.cudnn.enabled = False
 
 def l2_train(data, pret_model, pret_criterion, l1_test, seed,
                   freeze_net=False, start_lr=30, check_epoch=5, lr_patience=5,
-                  max_lr_decreases=5, cull_vocab=True, corpus_change="nothing"):
+                  max_lr_decreases=1, cull_vocab=True, corpus_change="nothing"):
     global model, criterion, optimizer, scheduler, params
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -71,6 +70,9 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,
                   scheduler, num_lr_decreases)
         epoch_batch, epoch_data_index = 0, 0
         epoch += 1
+        #########################
+        num_lr_decreases=1
+        #########################
         if num_lr_decreases >= max_lr_decreases:
             stop_condition_met = True
         if stop_condition_met == True:
@@ -81,6 +83,7 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,
             loss_at_epoch = evaluate(model, criterion, val_data, eval_batch_size)
             test_loss_at_epoch = evaluate(model, criterion, test_data, test_batch_size)
             print(f"Loss {loss_at_epoch}, test loss {test_loss_at_epoch}")
+            
     test_loss = evaluate(model, criterion, test_data, test_batch_size)
     l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
     #NOTE this assumes that weights are tied, which they have been for all the
@@ -100,7 +103,7 @@ def model_save(fn):
 # Training code
 ###############################################################################
 
-def evaluate(model, criterion, data_source, batch_size=10):
+def evaluate(model, criterion, data_source, batch_size=3):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0

@@ -22,6 +22,9 @@ args = parser.parse_args()
 args.cuda = True
 print(args)
 
+torch.backends.cudnn.enabled = False
+CUDA_LAUNCH_BLOCKING=1
+
 batch_size = 80
 eval_batch_size = 10
 test_batch_size = 1
