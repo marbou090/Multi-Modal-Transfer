@@ -8,6 +8,7 @@ import os
 import hashlib
 import pickle
 import json
+from tqdm import tqdm
 
 import training.model
 from training.splitcross import SplitCrossEntropyLoss
@@ -31,11 +32,11 @@ best_model = None
 last_train_loss = -1
 
 
-def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_path, run_name,
+def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
                   freeze_net=False, start_lr=30, check_epoch=5, lr_patience=5,
                   max_lr_decreases=1, cull_vocab=True, corpus_change="nothing"):
 
-    save_path = os.path.join(save_path, run_name, '-finetune')
+    save_path = os.path.join(save_dir, f"{run_name}-finetune.pickle")
     print(f"Finetuned model will save to {save_path}")
 
     global model, criterion, optimizer, scheduler, params
@@ -59,8 +60,7 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_path, run_name
     total_params = sum(x.size()[0] * x.size()[1] if len(x.size()) > 1 else x.size()[0] for x in params if x.size())
     print('Model total parameters:', total_params)
 
-    zero_shot_test = evaluate(model, criterion, test_data, test_batch_size)
-
+    
     epoch = 0
     num_lr_decreases = 0
     lr = start_lr
@@ -71,13 +71,20 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_path, run_name
 
     if os.path.exists(save_path):
         print(f"Model already fintuned! Resuming from {save_path}")
-        model_load(save_path)
+        load_data = model_load(save_path)
+        print(load_data)
+        model = load_data.model
         model.cuda()
         test_loss = evaluate(model, criterion, test_data, test_batch_size)
+        print(f'test_loss:{test_loss}')
         l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
-        return val_loss_list, test_loss, last_train_loss, overall_batch, epoch, \
-           loss_at_epoch, test_loss_at_epoch, train_loss_at_epoch, \
-           zero_shot_test, l1_test_loss, embeddings
+        print(f"l1_test_loss:{l1_test_loss}")
+
+        return load_data.val_loss_list, test_loss, last_train_loss, load_data.overall_batch, load_data.epoch, \
+           load_data.loss_at_epoch, load_data.test_loss_at_epoch, load_data.train_loss_at_epoch, \
+           load_data.zero_shot_test, l1_test_loss, load_data.embeddings
+
+    zero_shot_test = evaluate(model, criterion, test_data, test_batch_size)
 
     ##########################################################################
     #fintuning
@@ -104,40 +111,67 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_path, run_name
             test_loss_at_epoch = evaluate(model, criterion, test_data, test_batch_size)
             print(f"Loss {loss_at_epoch}, test loss {test_loss_at_epoch}")
 
-    print(f"Saving model to {save_path} ")
-    model_save(save_path)
+    embeddings = model.encoder.weight.detach().cpu().numpy()
 
-    test_loss = evaluate(model, criterion, test_data, test_batch_size)
+    print(f"Saving model to {save_path} ")
+    with open(save_path, 'wb') as f:
+        pickle.dump({'model':model, 
+                    'criterion':criterion,
+                     'optimizer':optimizer, 
+                     'scheduler':scheduler,
+                    'epoch':epoch, 
+                    'num_lr_decreases':num_lr_decreases, 
+                    'lr':lr, 
+                    'best_loss':best_loss, 
+                    'val_loss_list':val_loss_list,
+                     'overall_batch':overall_batch, 
+                     'epoch_batch':epoch_batch, 
+                     'epoch_data_index':epoch_data_index,
+                     'loss_at_epoch':loss_at_epoch,
+                     'test_loss_at_epoch':test_loss_at_epoch,
+                     'train_loss_at_epoch':train_loss_at_epoch,
+                     'zero_shot_test':zero_shot_test,
+                     'embeddings':embeddings,
+                     'last_train_loss':last_train_loss},
+                   f)
     l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
+    test_loss = evaluate(model, criterion, test_data, test_batch_size)
+    
     #NOTE this assumes that weights are tied, which they have been for all the
     #     experiments since the awd-lm main forces it.
-    embeddings = model.encoder.weight.detach().cpu().numpy()
+    
     return val_loss_list, test_loss, last_train_loss, overall_batch, epoch, \
            loss_at_epoch, test_loss_at_epoch, train_loss_at_epoch, \
            zero_shot_test, l1_test_loss, embeddings
 
 def model_load(fn):
-    global model, criterion, optimizer, scheduler, run_data
     with open(fn, 'rb') as f:
-        model, criterion, optimizer, scheduler, run_data = torch.load(f)
+        data= pickle.load(f)
+    return data
 
-def model_save(fn):
+"""
+def model_save(fn, epoch, num_lr_decreases,lr, best_loss, val_loss_list,
+                     overall_batch, epoch_batch, epoch_data_index,loss_at_epoch,test_loss_at_epoch,train_loss_at_epoch,
+                     zero_shot_test,embeddings):
     with open(fn, 'wb') as f:
         torch.save([model, criterion, optimizer, scheduler,
                     (epoch, num_lr_decreases, lr, best_loss, val_loss_list,
                      overall_batch, epoch_batch, epoch_data_index,loss_at_epoch,test_loss_at_epoch,train_loss_at_epoch,
                      zero_shot_test,embeddings)],
                    f)
+                   """
 ###############################################################################
 # Training code
 ###############################################################################
 
-def evaluate(model, criterion, data_source, batch_size=3):
+def evaluate(model, criterion, data_source, batch_size=10):
     # Turn on evaluation mode which disables dropout.
+    print('evaluating model')
     model.eval()
     total_loss = 0
     hidden = model.init_hidden(batch_size)
-    for i in range(0, data_source.size(0) - 1, args.bptt):
+    #print(f'criterion:{criterion}\n data_source:{data_source}')
+    for i in tqdm(range(0, data_source.size(0) - 1, args.bptt)):
         data, targets = get_batch(data_source, i, args, evaluation=True)
         output, hidden = model(data, hidden)
         total_loss += len(data) * criterion(model.decoder.weight, model.decoder.bias, output, targets).data
