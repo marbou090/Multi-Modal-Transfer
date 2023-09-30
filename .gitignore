@@ -9,3 +9,5 @@ pretrained_models/
 tensor2tensor-master
 pickled_files/
 ja/
+wandb/
+maestro-v3.0.0/

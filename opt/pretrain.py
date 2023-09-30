@@ -13,7 +13,8 @@ from paths import project_base_path
 from training import model
 from training.utils import batchify, get_batch, repackage_hidden, get_slice
 
-
+import wandb
+import datetime
 
 parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Language Model')
 ########
@@ -105,6 +106,12 @@ if args.small:
     args.nlayers = 1
     args.emsize = 100
     args.nhid = 128
+
+#############
+
+d_today = datetime.date.today()
+notes = (f'pretrain-{args.data}-{args.trial}')
+wandb.init(project='TILT Framework',notes=notes,config=args)
 
 # Set the random seed manually for reproducibility.
 seed = args.seed + args.trial
@@ -291,6 +298,12 @@ def train():
             total_loss = 0
             start_time = time.time()
 
+            wandb.log({
+                "tr loss ":cur_loss,
+                "tr ppl":math.exp(cur_loss),
+                "bpc":cur_loss / math.log(2)
+            })
+
         if overall_batch % args.valid_interval == 0 and overall_batch > 0:
             elapsed = time.time() - valid_time
             val_loss = evaluate(val_data, eval_batch_size)
@@ -311,6 +324,13 @@ def train():
                 print('Saving model (new best validation)')
                 stored_loss = val_loss
             best_val_loss.append(val_loss)
+            
+            wandb.log({
+                "valid loss":val_loss,
+                "valid ppl":math.exp(val_loss),
+                " valid bpc":val_loss / math.log(2)
+            })
+
         ###
         epoch_batch += 1
         overall_batch += 1
@@ -387,3 +407,6 @@ print('=' * 89)
 print('| End of training | test loss {:5.2f} | test ppl {:8.2f} | test bpc {:8.3f}'.format(
     test_loss, math.exp(test_loss), test_loss / math.log(2)))
 print('=' * 89)
+wandb.log({"test loss": test_loss, "test ppl":  math.exp(test_loss),"test bpc":test_loss / math.log(2)})
+
+wandb.finish()
