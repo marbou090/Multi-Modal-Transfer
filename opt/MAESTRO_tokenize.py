@@ -3,10 +3,10 @@ from csv import DictReader
 import os
 
 split_to_midi_fps = defaultdict(list)
-with open('/content/tilt-transfer/opt/maestro-v2.0.0/maestro-v2.0.0.csv', 'r') as f:
+with open('corpora/maestro-v3.0.0/maestro-v3.0.0.csv', 'r') as f:
   reader = DictReader(f)
   for r in reader:
-    split_to_midi_fps[r['split']].append(os.path.join('maestro-v2.0.0', r['midi_filename']))
+    split_to_midi_fps[r['split']].append(os.path.join('corpora/maestro-v3.0.0', r['midi_filename']))
 
 import tensorflow.compat.v1 as tf
 tf.to_float = lambda x: tf.cast(x, tf.float32)
@@ -35,7 +35,7 @@ import shutil
 import magenta.music as mm
 import numpy as np
 
-out_dir = './maestro_v2_tokens'
+out_dir = './maestro_v3_tokens'
 
 for split, midi_fps in split_to_midi_fps.items():
   split_dir = os.path.join(out_dir, split)
@@ -65,7 +65,7 @@ for split, midi_fps in split_to_midi_fps.items():
         #synth=mm.fluidsynth, sample_rate=SAMPLE_RATE, sf2_path=SF2_PATH)
     
     out_fp = fp[15:].replace('/', '_')
-    out_fp = out_fp.replace('.midi', '.npy')
+    #out_fp = out_fp.replace('.midi', '.npy')
     out_fp = os.path.join(split_dir, out_fp)
     
     print(out_fp)
@@ -73,6 +73,6 @@ for split, midi_fps in split_to_midi_fps.items():
     np.save(out_fp, ns)
 
 #!tar cvfz maestro_v2_tokens.tar.gz maestro_v2_tokens
-from google.colab import files
+#from google.colab import files
 
-files.download('maestro_v2_tokens.tar.gz')
+#files.download('maestro_v2_tokens.tar.gz')
