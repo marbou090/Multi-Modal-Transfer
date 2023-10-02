@@ -14,7 +14,6 @@ from training import model
 from training.utils import batchify, get_batch, repackage_hidden, get_slice
 
 import wandb
-import datetime
 
 parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Language Model')
 ########
@@ -109,7 +108,6 @@ if args.small:
 
 #############
 
-d_today = datetime.date.today()
 notes = (f'pretrain-{args.data}-{args.trial}')
 wandb.init(project='TILT Framework',notes=notes,config=args)
 

@@ -12,3 +12,7 @@ pickled_files/
 ja/
 wandb/
 maestro-v3.0.0/
+groove/
+groove_tokens/
+*.pickle
+l2_results/

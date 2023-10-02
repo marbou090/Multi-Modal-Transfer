@@ -98,7 +98,7 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
         epoch_batch, epoch_data_index = 0, 0
         epoch += 1
         #########################
-        num_lr_decreases=1
+        #num_lr_decreases=1
         #########################
         if num_lr_decreases >= max_lr_decreases:
             stop_condition_met = True
@@ -248,6 +248,9 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
                 best_loss = val_loss
                 print(f"New best loss {best_loss}")
                 best_model = model.state_dict()
+            ######################################
+            num_lr_decreases=1
+            ############################################
             valid_time = time.time()
         ###
         epoch_batch += 1

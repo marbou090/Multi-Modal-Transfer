@@ -29,13 +29,18 @@ batch_size = 80
 eval_batch_size = 10
 test_batch_size = 1
 
+import wandb
+
+
+
+
 def run():
     # Need to update this list with every experiment so that each one is
     # associated with an index for seed purposes.
     possible_pretrains = \
         ["pt", "ja", "code", "music", "unigram", "random", "es", "en", "ru", \
         "random310", "repetition", "paren", "paren-zipf", "valence", "de", "eu", \
-        "fi", "ro", "tr", "it", "ko", "def"]
+        "fi", "ro", "tr", "it", "ko", "def","groove","maestro"]
     #assert args.pretrain in possible_pretrains
 
     pretrain_type = args.pretrain if args.pretrain in ["music", "code"] else "language"
@@ -72,6 +77,11 @@ def run():
     seed = args.seed*100 + pretrain_idx
     np.random.seed(seed)
     for trial in range(args.trials[0], args.trials[1]):
+        ########################################
+        notes = (f'l2train-{args.pretrain}-{args.run_name}-trial-{trial}')
+        wandb.init(project='TILT Framework',notes=notes,config=args)
+        ########################################
+
         print(f"Starting {args.pretrain}, trial {trial}")
         model_path = os.path.join(pretrain_path, f"trial{str(trial)}")
         with open(model_path, 'rb') as f:
@@ -98,6 +108,16 @@ def run():
         results["pret_final_val"].append(run_data[4][-1])
         results["l1_test"].append(l1_test_loss)
         results["embeddings"].append(embeddings)
+        ##############################################################
+        wandb.log({
+            "val_loss_list":val_loss_list,
+            "val_at_convergence":val_loss_list[-1],
+            "test_at_convergence":test_loss,
+            "train_at_convergence":train_loss,
+            "l1_test":l1_test_loss
+        })
+        wandb.finish()
+        ###############################################################
         pickle.dump(results, open(save_path, "wb"))
 
 def load_corpus(data_path, cull_vocab=True, shuffle_vocab=False):
