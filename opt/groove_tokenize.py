@@ -3,10 +3,10 @@ from csv import DictReader
 import os
 
 split_to_midi_fps = defaultdict(list)
-with open('corpora/groove/info.csv', 'r') as f:
+with open('corpora/e-gmd-v1.0.0/e-gmd-v1.0.0.csv', 'r') as f:
   reader = DictReader(f)
   for r in reader:
-    split_to_midi_fps[r['split']].append(os.path.join('corpora/groove', r['midi_filename']))
+    split_to_midi_fps[r['split']].append(os.path.join('corpora/e-gmd-v1.0.0', r['midi_filename']))
 
 import tensorflow.compat.v1 as tf
 tf.to_float = lambda x: tf.cast(x, tf.float32)
@@ -35,7 +35,7 @@ import shutil
 import magenta.music as mm
 import numpy as np
 
-out_dir = './corpora/groove_tokens'
+out_dir = './corpora/gmd_tokens'
 
 for split, midi_fps in split_to_midi_fps.items():
   split_dir = os.path.join(out_dir, split)

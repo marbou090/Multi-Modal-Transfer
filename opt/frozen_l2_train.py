@@ -40,7 +40,7 @@ def run():
     possible_pretrains = \
         ["pt", "ja", "code", "music", "unigram", "random", "es", "en", "ru", \
         "random310", "repetition", "paren", "paren-zipf", "valence", "de", "eu", \
-        "fi", "ro", "tr", "it", "ko", "def","groove","maestro"]
+        "fi", "ro", "tr", "it", "ko", "def","groove","maestro","groove_expanded"]
     #assert args.pretrain in possible_pretrains
 
     pretrain_type = args.pretrain if args.pretrain in ["music", "code"] else "language"
@@ -120,7 +120,7 @@ def run():
         ###############################################################
         pickle.dump(results, open(save_path, "wb"))
 
-def load_corpus(data_path, cull_vocab=True, shuffle_vocab=False):
+def load_corpus(data_path, cull_vocab=False, shuffle_vocab=False):
     """
     if cull_vocab:
         data_path = data_path + ".cull"

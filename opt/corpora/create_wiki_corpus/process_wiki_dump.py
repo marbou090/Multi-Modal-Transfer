@@ -7,6 +7,7 @@ import pickle
 import stanfordnlp
 import sys
 import xml.etree.cElementTree as etree
+import tqdm
 
 parser = argparse.ArgumentParser(description='Scrape your own wikicorpora!')
 parser.add_argument('--dump-file', type=str, \
@@ -33,8 +34,8 @@ def make_corpus(args):
         models_dir="/u/nlp/data/stanfordnlp_resources/")
     total_tokens = 0
     checkpoint = 100000
-    for event, elem in etree.iterparse(
-            args.dump_file, events=('start', 'end', 'start-ns', 'end-ns')):
+    for event, elem in tqdm.tqdm((etree.iterparse)(
+            args.dump_file, events=('start', 'end', 'start-ns', 'end-ns'))):
         if event == 'end':
             if elem.tag == add_ns("page"):
                 ns = elem.find(add_ns("ns"))
