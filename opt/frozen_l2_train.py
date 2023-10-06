@@ -1,5 +1,4 @@
 import argparse
-import hashlib
 import numpy as np
 import os
 import pickle
@@ -54,7 +53,7 @@ def run():
 
     l2_data_type = args.finetuneType if args.finetuneType in ["music", "code"] else "language"
     l2_data_location = os.path.join(project_base_path, "corpora", "pickled_files", f"corpus-{args.finetuneFile}")
-    corpus = load_corpus(l2_data_location, l2_data_type, shuffle_vocab=True)
+    corpus = load_corpus(l2_data_location, l2_data_type, shuffle_vocab=False)
     train_data = batchify(corpus.train, batch_size, args)
     val_data = batchify(corpus.valid, eval_batch_size, args)
     test_data = batchify(corpus.test, test_batch_size, args)
@@ -120,14 +119,13 @@ def run():
         ###############################################################
         pickle.dump(results, open(save_path, "wb"))
 
-def load_corpus(data_path, cull_vocab=False, shuffle_vocab=False):
-    """
+def load_corpus(data_path, cull_vocab=True, shuffle_vocab=False):
     if cull_vocab:
         data_path = data_path + ".cull"
     if shuffle_vocab:
         assert cull_vocab, "Usually don't have unculled shuffled corpora"
         data_path = data_path + "-shuf"
-        """
+
     corpus = torch.load(data_path)
     return corpus
 
