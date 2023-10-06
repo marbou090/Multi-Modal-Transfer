@@ -1,11 +1,12 @@
 import argparse
 import os
+import numpy as np
 import pickle
 import torch
 
 from paths import project_base_path
 from training.utils import batchify, get_batch, repackage_hidden, get_slice
-from training.probing import probing
+from training.probing import probing_train
 
 
 parser = argparse.ArgumentParser()
@@ -14,6 +15,7 @@ parser.add_argument('--pretrain', type=str, help="Which pretrained model")
 parser.add_argument('--trial', type=int, default=0,
                     help='trial  (of pretrained models)')
 parser.add_argument('--probe-task', type=str, default='Case', help='which probe task')
+parser.add_argument('--seed', type=int, default=4, help="Seed will be args.seed*100 + the pretrain_index")
 args = parser.parse_args()
 args.cuda = True
 print(args)
@@ -26,7 +28,7 @@ batch_size =80
 
 def run():
     pretrain_path = os.path.join(project_base_path, "models", "pretrained_models", args.pretrain)
-    pretrain_idx = possible_pretrains.index(args.pretrain)
+    pretrain_idx = possible_probetask.index(args.probe_task)
     save_dir = os.path.join(project_base_path, "models", "probes", args.pretrain)
     if not os.path.exists(save_dir):
             os.mkdir(save_dir)
@@ -42,11 +44,13 @@ def run():
     seed = args.seed*100 + pretrain_idx
     np.random.seed(seed)
 
-    print(f"Starting {args.pretrain}-{trial} : Probe tasks {args.probe_task}")
-    model_path = os.path.join(pretrain_path, f"trial{str(trial)}")
+    print(f"Starting {args.pretrain}-{args.trial} : Probe tasks {args.probe_task}")
+    model_path = os.path.join(pretrain_path, f"trial{str(args.trial)}")
     with open(model_path, 'rb') as f:
             model, criterion, optimizer, scheduler, run_data = torch.load(f)
     test_loss = probing_train((train_data,val_data,test_data), model, criterion, seed, save_dir=save_dir, run_name=args.run_name)
+
+    print(test_loss)
 
 
 
