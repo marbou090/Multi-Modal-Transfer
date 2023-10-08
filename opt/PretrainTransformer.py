@@ -236,15 +236,16 @@ print('Model total parameters:', total_params)
 # Training code
 ###############################################################################
 
-def evaluate(data_source, batch_size=10):
+def evaluate(data_source, src_mask,batch_size=10):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0
     ntokens = len(corpus.dictionary)
-    hidden = model.init_weights()
+    
     for i in range(0, data_source.size(0) - 1, args.bptt):
         data, targets = get_batch(data_source, i, args, evaluation=True)
-        output = model(data, hidden)
+
+        output = model(data, src_mask)
         total_loss += len(data) * criterion(output.view(-1, ntokens), targets).data
         #hidden = repackage_hidden(hidden)
     return total_loss.item() / len(data_source)
@@ -270,12 +271,20 @@ def train():
         lr2 = optimizer.param_groups[0]['lr']
         optimizer.param_groups[0]['lr'] = lr2 * seq_len / args.bptt
         model.train()
+        """
+        print(f"train data size :{train_data.size()}")
+        print(f'epoch data index :{epoch_data_index}')
+        """
         data, targets = get_batch(train_data, epoch_data_index, args, seq_len=seq_len)
-        src_mask = model.generate_square_subsequent_mask(data.size(0)).to(device)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
-        #print(hidden)
-        #hidden = repackage_hidden(hidden)
+        """
+        print(f"bptt :{bptt}")
+        print(f'aargs bptt : {args.bptt}')
+        print(f'data size :{data.size()}')
+        print(f'src mask size: {src_mask.size()}')
+        print('---------------------------')
+        """
         optimizer.zero_grad()
         output= model(data, src_mask)
         #raw_loss = criterion(model.decoder.weight, model.decoder.bias, output, targets)
@@ -313,7 +322,8 @@ def train():
             """
         if overall_batch % args.valid_interval == 0 and overall_batch > 0:
             elapsed = time.time() - valid_time
-            val_loss = evaluate(val_data, eval_batch_size)
+            
+            val_loss = evaluate(val_data, src_mask,eval_batch_size)
             val_loss_list.append(val_loss)
             scheduler.step(val_loss)
             if scheduler.in_cooldown:
@@ -409,7 +419,9 @@ except KeyboardInterrupt:
 model_load(save_fn)
 
 # Run on test data.
-test_loss = evaluate(test_data, test_batch_size)
+data, targets = get_batch(test_data, epoch_data_index, args, seq_len=seq_len)
+src_mask = model.generate_square_subsequent_mask(data.size(0)).to(device)
+test_loss = evaluate(test_data, src_mask, test_batch_size)
 print('=' * 89)
 print('| End of training | test loss {:5.2f} | test ppl {:8.2f} | test bpc {:8.3f}'.format(
     test_loss, math.exp(test_loss), test_loss / math.log(2)))
