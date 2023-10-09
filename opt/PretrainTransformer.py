@@ -243,8 +243,17 @@ def evaluate(data_source, src_mask,batch_size=10):
     ntokens = len(corpus.dictionary)
     
     for i in range(0, data_source.size(0) - 1, args.bptt):
-        data, targets = get_batch(data_source, i, args, evaluation=True)
-
+        data, targets = get_batch(data_source, i, args)
+        #print(f"data size:{data.size()}")
+        #print(f"src_mask size:{src_mask.size()}")
+        #print(len(data))
+        #print(len(src_mask[0]))
+        if not len(data) == len(src_mask[0]):
+            print(f"data size:{data.size()}")
+            print(f"src_mask size:{src_mask.size()}")
+            print(len(data))
+            print(len(src_mask[0]))
+            continue
         output = model(data, src_mask)
         total_loss += len(data) * criterion(output.view(-1, ntokens), targets).data
         #hidden = repackage_hidden(hidden)
@@ -273,20 +282,23 @@ def train():
         model.train()
         """
         print(f"train data size :{train_data.size()}")
-        print(f'epoch data index :{epoch_data_index}')
-        """
+        print(f'epoch data index :{epoch_data_index}')"""
         data, targets = get_batch(train_data, epoch_data_index, args, seq_len=seq_len)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
-        """
-        print(f"bptt :{bptt}")
-        print(f'aargs bptt : {args.bptt}')
-        print(f'data size :{data.size()}')
-        print(f'src mask size: {src_mask.size()}')
-        print('---------------------------')
-        """
+        if len(data)==len(src_mask[0]):
+            output= model(data, src_mask)
+        else:
+            print(f"bptt :{bptt}")
+            print(f'aargs bptt : {args.bptt}')
+            print(f'data size :{data.size()}')
+            print(f'src mask size: {src_mask.size()}')
+            epoch_batch += 1
+            overall_batch += 1
+            epoch_data_index += seq_len
+            continue
         optimizer.zero_grad()
-        output= model(data, src_mask)
+        
         #raw_loss = criterion(model.decoder.weight, model.decoder.bias, output, targets)
 
         raw_loss = criterion(output.view(-1, ntokens), targets)
@@ -323,7 +335,7 @@ def train():
         if overall_batch % args.valid_interval == 0 and overall_batch > 0:
             elapsed = time.time() - valid_time
             
-            val_loss = evaluate(val_data, src_mask,eval_batch_size)
+            val_loss = evaluate(val_data, src_mask, eval_batch_size)
             val_loss_list.append(val_loss)
             scheduler.step(val_loss)
             if scheduler.in_cooldown:
@@ -418,6 +430,9 @@ except KeyboardInterrupt:
 # Load the best saved model.
 model_load(save_fn)
 
+seq_len = max(5, int(np.random.normal(args.bptt, 5)))
+# There's a very small chance that it could select a very long sequence length resulting in OOM
+seq_len = min(seq_len, args.bptt + 10)
 # Run on test data.
 data, targets = get_batch(test_data, epoch_data_index, args, seq_len=seq_len)
 src_mask = model.generate_square_subsequent_mask(data.size(0)).to(device)
