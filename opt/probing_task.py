@@ -5,7 +5,7 @@ import pickle
 import torch
 
 from paths import project_base_path
-from training.utils import batchify, get_batch, repackage_hidden, get_slice
+from training.utils import batchify, repackage_hidden, get_slice
 from training.probing import probing_train
 
 

@@ -13,7 +13,7 @@ import torch.nn as nn
 from corpora import data
 from paths import project_base_path
 from training import Transformer
-from training.utils import batchify, get_batch, repackage_hidden, get_slice
+from training.utils import batchify, repackage_hidden, get_slice
 
 import wandb
 
@@ -201,7 +201,8 @@ scheduler = None
 run_data = None
 ntokens = len(corpus.dictionary)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = Transformer.TransformerModel(ntokens, args.emsize, args.nhead,args.nhid,args.nlayers)
+assert ntokens <= args.num_embs, "Vocab can't be bigger than number of embeddings"
+model = Transformer.TransformerModel(args.num_embs, args.emsize, args.nhead,args.nhid,args.nlayers)
 
 ###
 save_path = os.path.join(project_base_path, "models", "pretrained_models", args.data)
@@ -221,7 +222,7 @@ if not criterion:
         # WikiText-103
         splits = [2800, 20000, 76000]
     print('Using', splits)
-    criterion = SplitCrossEntropyLoss(args.emsize, splits=splits, verbose=False)
+    criterion = nn.CrossEntropyLoss()
 ###
 if args.cuda:
     model = model.cuda()
@@ -236,30 +237,26 @@ print('Model total parameters:', total_params)
 # Training code
 ###############################################################################
 
-def evaluate(data_source, src_mask,batch_size=10):
+def get_batch(source, i):
+    seq_len = min(args.bptt, len(source) - 1 - i)
+    data = source[i:i+seq_len]
+    target = source[i+1:i+1+seq_len].view(-1)
+    return data, target
+
+
+def evaluate(data_source):
     # Turn on evaluation mode which disables dropout.
     model.eval()
-    total_loss = 0
+    total_loss = 0.
     ntokens = len(corpus.dictionary)
-    
-    for i in range(0, data_source.size(0) - 1, args.bptt):
-        data, targets = get_batch(data_source, i, args)
-        #print(f"data size:{data.size()}")
-        #print(f"src_mask size:{src_mask.size()}")
-        #print(len(data))
-        #print(len(src_mask[0]))
-        if not len(data) == len(src_mask[0]):
-            print(f"data size:{data.size()}")
-            print(f"src_mask size:{src_mask.size()}")
-            print(len(data))
-            print(len(src_mask[0]))
-            continue
-        output = model(data, src_mask)
-        total_loss += len(data) * criterion(output.view(-1, ntokens), targets).data
-        #hidden = repackage_hidden(hidden)
-    return total_loss.item() / len(data_source)
+    with torch.no_grad():
+        for i in range(0, data_source.size(0) - 1, args.bptt):
+            data, targets = get_batch(data_source, i)
+            output = model(data)
+            output = output.view(-1, args.num_embs)
+            total_loss += len(data) * criterion(output, targets).item()
+    return total_loss / (len(data_source) - 1)
 
-criterion = nn.CrossEntropyLoss()
 def train():
     # Turn on training mode which enables dropout.
     global overall_batch, epoch_batch, epoch_data_index, valid_time, best_val_loss, val_loss_list, stored_loss, scheduler, num_lr_decreases
@@ -267,9 +264,7 @@ def train():
     total_loss = 0
     start_time = time.time()
     ntokens = len(corpus.dictionary)
-    print(f'ntoken:{ntokens}')
-    #hidden = model.init_weights()
-    src_mask = model.generate_square_subsequent_mask(args.bptt).to(device)
+
     while epoch_data_index < train_data.size(0) - 1 - 1:
         bptt = args.bptt if np.random.random() < 0.95 else args.bptt / 2.
         # Prevent excessively small or negative sequence lengths
@@ -280,49 +275,34 @@ def train():
         lr2 = optimizer.param_groups[0]['lr']
         optimizer.param_groups[0]['lr'] = lr2 * seq_len / args.bptt
         model.train()
-        """
-        print(f"train data size :{train_data.size()}")
-        print(f'epoch data index :{epoch_data_index}')"""
-        data, targets = get_batch(train_data, epoch_data_index, args, seq_len=seq_len)
+        data, targets = get_batch(train_data, epoch_data_index)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
-        if len(data)==len(src_mask[0]):
-            output= model(data, src_mask)
-        else:
-            print(f"bptt :{bptt}")
-            print(f'aargs bptt : {args.bptt}')
-            print(f'data size :{data.size()}')
-            print(f'src mask size: {src_mask.size()}')
-            epoch_batch += 1
-            overall_batch += 1
-            epoch_data_index += seq_len
-            continue
         optimizer.zero_grad()
-        
-        #raw_loss = criterion(model.decoder.weight, model.decoder.bias, output, targets)
+        output= model(data)
+        loss = criterion(output.view(-1, args.num_embs), targets)
 
-        raw_loss = criterion(output.view(-1, ntokens), targets)
-
-        loss = raw_loss
         # Activiation Regularization
         #if args.alpha: loss = loss + sum(args.alpha * dropped_rnn_h.pow(2).mean() for dropped_rnn_h in dropped_rnn_hs[-1:])
         # Temporal Activation Regularization (slowness)
         #if args.beta: loss = loss + sum(args.beta * (rnn_h[1:] - rnn_h[:-1]).pow(2).mean() for rnn_h in rnn_hs[-1:])
+
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
-        if args.clip: torch.nn.utils.clip_grad_norm_(params, args.clip)
+        if args.clip: torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         optimizer.step()
 
-        total_loss += raw_loss.data
+        total_loss += loss.item()
         optimizer.param_groups[0]['lr'] = lr2
         if epoch_batch % args.log_interval == 0 and epoch_batch > 0:
-            cur_loss = total_loss.item() / args.log_interval
+            cur_loss =total_loss / args.log_interval
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
                     'tr loss {:5.2f} | tr ppl {:8.2f} | bpc {:8.3f}'.format(
                 epoch, epoch_batch, len(train_data) // args.bptt, optimizer.param_groups[0]['lr'],
-                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss), cur_loss / math.log(2)))
+                elapsed * 1000 / args.log_interval, 
+                cur_loss, math.exp(cur_loss), cur_loss / math.log(2)))
             total_loss = 0
             start_time = time.time()
             """
@@ -335,7 +315,7 @@ def train():
         if overall_batch % args.valid_interval == 0 and overall_batch > 0:
             elapsed = time.time() - valid_time
             
-            val_loss = evaluate(val_data, src_mask, eval_batch_size)
+            val_loss = evaluate(val_data)
             val_loss_list.append(val_loss)
             scheduler.step(val_loss)
             if scheduler.in_cooldown:
@@ -434,9 +414,8 @@ seq_len = max(5, int(np.random.normal(args.bptt, 5)))
 # There's a very small chance that it could select a very long sequence length resulting in OOM
 seq_len = min(seq_len, args.bptt + 10)
 # Run on test data.
-data, targets = get_batch(test_data, epoch_data_index, args, seq_len=seq_len)
-src_mask = model.generate_square_subsequent_mask(data.size(0)).to(device)
-test_loss = evaluate(test_data, src_mask, test_batch_size)
+data, targets = get_batch(test_data, epoch_data_index)
+test_loss = evaluate(test_data)
 print('=' * 89)
 print('| End of training | test loss {:5.2f} | test ppl {:8.2f} | test bpc {:8.3f}'.format(
     test_loss, math.exp(test_loss), test_loss / math.log(2)))
