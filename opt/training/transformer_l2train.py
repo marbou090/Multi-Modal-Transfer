@@ -69,7 +69,6 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
     overall_batch, epoch_batch, epoch_data_index = 0, 0, 0
     valid_time = time.time()
     stop_condition_met = False
-    src_mask = model.generate_square_subsequent_mask(args.bptt).to(device)
     if os.path.exists(save_path):
         print(f"Model already fintuned! Resuming from {save_path}")
         load_data = model_load(save_path)
@@ -181,7 +180,7 @@ def evaluate(data_source):
         for i in range(0, data_source.size(0) - 1, args.bptt):
             data, targets = get_batch(data_source, i)
             output = model(data)
-            output = output.view(-1, ntokens)
+            output = output.view(-1, args.num_embs)
             total_loss += len(data) * criterion(output, targets).item()
     return total_loss / (len(data_source) - 1)
 
@@ -212,20 +211,14 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         
         optimizer.zero_grad()
-        
-        #raw_loss = criterion(model.decoder.weight, model.decoder.bias, output, targets)
-        #print(f'data size:{data.size()}')
-        #print(f'targets size: {targets.size()}')
         output= model(data)
-        output = output.view(-1, ntokens)
-        #print(f'output size: {output.size()}')
+        output = output.view(-1, args.num_embs)
         loss = criterion(output, targets)
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-        for p in model.parameters():
-            p.data.add_(p.grad, alpha=-lr)
-
+        # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+        if args.clip: torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+        optimizer.step()
 
         total_loss += loss.item()
         optimizer.param_groups[0]['lr'] = lr2
