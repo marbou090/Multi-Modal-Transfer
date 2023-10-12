@@ -28,9 +28,9 @@ freq = np.array(freq)
 ps = freq / sum(freq)
 
 if args.zipf:
-    save_fn = os.path.join(project_path, "corpora", "pickled_files", f"corpus-paren-zipf.cull") 
+    save_fn = os.path.join(project_path, "corpora", "pickled_files", f"corpus-paren-zipf-{args.lang}.cull") 
 else:
-    save_fn = os.path.join(project_path, "corpora", "pickled_files", f"corpus-paren.cull") 
+    save_fn = os.path.join(project_path, "corpora", "pickled_files", f"corpus-paren-{args.lang}.cull") 
 
 open_prob = 0.4
 paren_corpus = Corpus()
