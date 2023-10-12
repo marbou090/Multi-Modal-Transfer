@@ -38,7 +38,7 @@ def probing_tokenize(corpus, path):
     with open(path, 'r') as f:
         tokens = 0
         for line in f:
-            line = re.sub('\A[A-Z][a-z][a-z]','',line)
+            #line = re.sub('\A[A-Z][a-z][a-z]','',line)
             words = line.split() + ['<eos>']
             tokens += len(words)
             for word in words:
@@ -49,11 +49,17 @@ def probing_tokenize(corpus, path):
         ids = torch.LongTensor(tokens)
         token = 0
         for line in f:
-            line = re.sub('\A[A-Z][a-z][a-z]','',line)
+            #line = re.sub('\A[A-Z][a-z][a-z]','',line)
             words = line.split() + ['<eos>']
             for word in words:
                 ids[token] = corpus.dictionary.get_index(word)
+                print(f'word:{word}')
+                print(f'token:{corpus.dictionary.get_index(word)}')
+                print('-'*89)
+                    
                 token += 1
+            if token > 100:
+                exit()
     return ids
 
 if __name__ == "__main__":

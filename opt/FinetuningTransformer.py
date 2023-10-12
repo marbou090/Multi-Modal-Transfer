@@ -4,6 +4,8 @@ import os
 import pickle
 import torch
 
+import wandb
+
 from corpora import data
 from paths import project_base_path
 from training.transformer_l2train import l2_train
@@ -29,7 +31,7 @@ batch_size = 70
 eval_batch_size = 10
 test_batch_size = 1
 
-#import wandb
+
 def run():
     # Need to update this list with every experiment so that each one is
     # associated with an index for seed purposes.
@@ -75,11 +77,10 @@ def run():
     seed = args.seed*100 + pretrain_idx
     np.random.seed(seed)
     for trial in range(args.trials[0], args.trials[1]):
-        ########################################
-        #notes = (f'l2train-{args.pretrain}-{args.run_name}-trial-{trial}')
-        #wandb.init(project='TILT Framework',notes=notes,config=args)
-        ########################################
-
+        ##############################################################
+        notes = (f'Transformer-l2train-{args.pretrain}-{args.run_name}-trial-{trial}')
+        wandb.init(project='TILT Framework',notes=notes,config=args)
+        ##############################################################
         print(f"Starting {args.pretrain}, trial {trial}")
         model_path = os.path.join(pretrain_path, f"trial{str(trial)}")
         with open(model_path, 'rb') as f:
@@ -107,7 +108,7 @@ def run():
         results["l1_test"].append(l1_test_loss)
         results["embeddings"].append(embeddings)
         ##############################################################
-        """
+
         wandb.log({
             "val_loss_list":val_loss_list,
             "val_at_convergence":val_loss_list[-1],
@@ -116,7 +117,7 @@ def run():
             "l1_test":l1_test_loss
         })
         wandb.finish()
-        """
+
         ###############################################################
         pickle.dump(results, open(save_path, "wb"))
 

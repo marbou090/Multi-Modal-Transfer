@@ -55,8 +55,14 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
         optimizer, patience=lr_patience, cooldown=1)
     if freeze_net:
         print("Freezing the neural network, just training embeddings")
-        for param in model.parameters():
-            param.requires_grad = False
+        for name,param in model.named_parameters():
+            if not ((name=='decoder.bias') or (name=='decoder.weight')):
+                param.requires_grad = False
+            else:
+                print("-"*20)
+                print(f"name: {name}")
+                print(f"requires grad:{param.requires_grad} ")
+            
     params = list(model.parameters()) + list(criterion.parameters())
     total_params = sum(x.size()[0] * x.size()[1] if len(x.size()) > 1 else x.size()[0] for x in params if x.size())
     print('Model total parameters:', total_params)
@@ -69,24 +75,8 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
     overall_batch, epoch_batch, epoch_data_index = 0, 0, 0
     valid_time = time.time()
     stop_condition_met = False
-    if os.path.exists(save_path):
-        print(f"Model already fintuned! Resuming from {save_path}")
-        load_data = model_load(save_path)
-        print(load_data)
-        model = load_data.model
-        model.cuda()
-        
-        test_loss = evaluate(test_data, test_batch_size,src_mask, l2_ntokens)
-        print(f'test_loss:{test_loss}')
-        l1_test_loss = evaluate(l1_test, test_batch_size,src_mask, l1_ntokens)
-        print(f"l1_test_loss:{l1_test_loss}")
 
-        return load_data.val_loss_list, test_loss, last_train_loss, load_data.overall_batch, load_data.epoch, \
-           load_data.loss_at_epoch, load_data.test_loss_at_epoch, load_data.train_loss_at_epoch, \
-           load_data.zero_shot_test, l1_test_loss, load_data.embeddings
-
-
-    #zero_shot_test = evaluate(test_data, test_batch_size, src_mask,  l2_ntokens)
+    zero_shot_test = evaluate(test_data)
 
     ##########################################################################
     #fintuning
@@ -109,8 +99,8 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
         if epoch == check_epoch:
             print("Reached check epoch, calculating validation loss")
             train_loss_at_epoch = last_train_loss
-            loss_at_epoch = evaluate(val_data, eval_batch_size, src_mask ,l2_ntokens)
-            test_loss_at_epoch = evaluate(test_data, test_batch_size, src_mask, l2_ntokens)
+            loss_at_epoch = evaluate(val_data)
+            test_loss_at_epoch = evaluate(test_data)
             print(f"Loss {loss_at_epoch}, test loss {test_loss_at_epoch}")
 
     embeddings = model.encoder.weight.detach().cpu().numpy()
@@ -136,8 +126,8 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
                      'embeddings':embeddings,
                      'last_train_loss':last_train_loss},
                    f)
-    l1_test_loss = evaluate(l1_test, test_batch_size,src_mask,l1_ntokens)
-    test_loss = evaluate(test_data, test_batch_size,src_mask, l2_ntokens)
+    l1_test_loss = evaluate(l1_test)
+    test_loss = evaluate(test_data)
     
     #NOTE this assumes that weights are tied, which they have been for all the
     #     experiments since the awd-lm main forces it.
@@ -175,7 +165,6 @@ def evaluate(data_source):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0.
-    ntokens = len(corpus.dictionary)
     with torch.no_grad():
         for i in range(0, data_source.size(0) - 1, args.bptt):
             data, targets = get_batch(data_source, i)
@@ -222,50 +211,40 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
 
         total_loss += loss.item()
         optimizer.param_groups[0]['lr'] = lr2
-        if epoch_batch % args.log_interval == 0 and epoch_batch > 0:
-            cur_loss = total_loss.item() / args.log_interval
+        if overall_batch % args.log_interval == 0 and overall_batch > 0:
+            cur_loss = total_loss / args.log_interval
             elapsed = time.time() - start_time
-            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
+            print('| {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
                     'tr loss {:5.2f} | tr ppl {:8.2f} | bpc {:8.3f}'.format(
-                epoch, epoch_batch, len(train_data) // args.bptt, optimizer.param_groups[0]['lr'],
+                epoch_batch, len(train_data) // args.bptt, optimizer.param_groups[-1]['lr'],
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss), cur_loss / math.log(2)))
+            last_train_loss = cur_loss
             total_loss = 0
             start_time = time.time()
-            """
-            wandb.log({
-                "tr loss ":cur_loss,
-                "tr ppl":math.exp(cur_loss),
-                "bpc":cur_loss / math.log(2)
-            })
-            """
+
         if overall_batch % args.valid_interval == 0 and overall_batch > 0:
             elapsed = time.time() - valid_time
-            src_mask = model.generate_square_subsequent_mask(args.bptt).to(device)
-            val_loss = evaluate(val_data, ntokens, src_mask, eval_batch_size)
+            val_loss = evaluate(val_data)
             val_loss_list.append(val_loss)
             scheduler.step(val_loss)
             if scheduler.in_cooldown:
                 num_lr_decreases += 1
                 print(f"Just decreased learning rate! Have decreased {num_lr_decreases} times.")
+                print("Loading best model so far")
+                model.load_state_dict(best_model)
             print('-' * 89)
             print('| validating at batch {:3d} | time: {:5.2f}m | valid loss {:5.2f} | '
                 'valid ppl {:8.2f} | valid bpc {:8.3f}'.format(
               overall_batch, elapsed / 60, val_loss, math.exp(val_loss), val_loss / math.log(2)))
             print('-' * 89)
+            if val_loss < best_loss:
+                best_loss = val_loss
+                print(f"New best loss {best_loss}")
+                best_model = model.state_dict()
+            ######################################
+            #num_lr_decreases=1
+            ############################################
             valid_time = time.time()
-            if val_loss < stored_loss:
-                model_save(save_fn)
-                
-                print('Saving model (new best validation)')
-                stored_loss = val_loss
-            best_val_loss.append(val_loss)
-            """
-            wandb.log({
-                "valid loss":val_loss,
-                "valid ppl":math.exp(val_loss),
-                " valid bpc":val_loss / math.log(2)
-            })"""
-
         ###
         epoch_batch += 1
         overall_batch += 1
