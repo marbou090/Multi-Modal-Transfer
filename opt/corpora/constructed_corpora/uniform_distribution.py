@@ -3,22 +3,25 @@ import collections
 import hashlib
 import numpy as np
 import torch
+import os
 
 import sys
-sys.path.insert(0,'/u/scr/isabelvp/multilingual-transfer/salesforce-awd-lm')
+this_file_path = os.path.join(os.getcwd(), __file__)
+project_path = os.path.split(os.path.split(os.path.split(this_file_path)[0])[0])[0]
+print(project_path)
+sys.path.insert(0, project_path)
 
-import data
+import corpora.data as data
 
 default_vocab_size = 50000
 parser = argparse.ArgumentParser(description="Create a corpus from a uniform distribution")
+parser.add_argument("--lang", type=str, default="ja", help="corpus to base this one off of (length, vocab size etc)")
 parser.add_argument('--vocab-size', type=int, default=default_vocab_size)
 args = parser.parse_args()
 
 # Language to base the corpus length on. Should not be that important.
-lang = "es"
-lang_location = f"/u/scr/nlp/isabelvp/wiki-multilingual/{lang}/{lang}wiki-corpus-"
-fn = '/u/scr/isabelvp/multilingual-transfer/salesforce-awd-lm/sf_corpora/onelang/corpus.{}.culldata'.format(hashlib.md5(lang_location.encode()).hexdigest())
-lang_corpus = torch.load(fn)
+lang_fn = os.path.join(project_path, "corpora", "pickled_files", f"corpus-{args.lang}.cull")
+lang_corpus = torch.load(lang_fn)
 
 uni_corpus = data.Corpus()
 uni_corpus.dictionary = lang_corpus.dictionary
@@ -33,8 +36,8 @@ uni_corpus.test = torch.LongTensor(
 print(f"Made train/valid/test, train_length is {len(uni_corpus.train)}")
 
 if args.vocab_size == default_vocab_size:
-    save_fn = '/u/scr/isabelvp/multilingual-transfer/salesforce-awd-lm/sf_corpora/onelang/corpus.{}.culldata'.format(hashlib.md5(f"random".encode()).hexdigest())
+    save_fn = os.path.join(project_path, "corpora", "pickled_files", f"corpus-random-{args.lang}.cull") 
 else:
-    save_fn = '/u/scr/isabelvp/multilingual-transfer/salesforce-awd-lm/sf_corpora/onelang/corpus.{}.culldata'.format(hashlib.md5(f"random{args.vocab_size}".encode()).hexdigest())
+    save_fn = os.path.join(project_path, "corpora", "pickled_files", f"corpus-random-{args.lang}-size{args.vocab_size}.cull") 
 print(f"Saving to {save_fn}")
 torch.save(uni_corpus, save_fn)
