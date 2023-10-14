@@ -138,7 +138,7 @@ def model_load(fn):
     with open(fn, 'rb') as f:
         model, criterion, optimizer, scheduler, run_data = torch.load(f)
 
-save_dir = os.path.join(project_base_path, "models", "pretrained_models", args.data)
+save_dir = os.path.join(project_base_path, "models", "pretrained_models", "RNN",args.data)
 if args.save is not "":
     save_dir = f"{save_dir}-{args.save}"
 if not os.path.exists(save_dir):

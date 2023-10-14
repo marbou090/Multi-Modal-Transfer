@@ -43,9 +43,9 @@ def run():
     #assert args.pretrain in possible_pretrains
 
     pretrain_type = args.pretrain if args.pretrain in ["music", "code"] else "language"
-    pretrain_path = os.path.join(project_base_path, "models", "pretrained_models", args.pretrain)
+    pretrain_path = os.path.join(project_base_path, "models", "pretrained_models", "RNN",args.pretrain)
     pretrain_idx = possible_pretrains.index(args.pretrain)
-    save_dir = os.path.join(project_base_path, "models", "l2_results", args.pretrain)
+    save_dir = os.path.join(project_base_path, "models", "l2_results", "RNN",args.pretrain)
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
     save_path = os.path.join(save_dir, args.run_name)

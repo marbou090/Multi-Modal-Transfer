@@ -142,7 +142,7 @@ def model_load(fn):
     with open(fn, 'rb') as f:
         model, criterion, optimizer, scheduler, run_data = torch.load(f)
 
-save_dir = os.path.join(project_base_path, "models", "pretrained_models", args.data)
+save_dir = os.path.join(project_base_path, "models", "pretrained_models",  "Transformer",args.data)
 if args.save is not "":
     save_dir = f"{save_dir}-{args.save}"
 if not os.path.exists(save_dir):
@@ -205,7 +205,6 @@ assert ntokens <= args.num_embs, "Vocab can't be bigger than number of embedding
 model = Transformer.TransformerModel(args.num_embs, args.emsize, args.nhead,args.nhid,args.nlayers)
 
 ###
-save_path = os.path.join(project_base_path, "models", "pretrained_models", args.data)
 if os.path.exists(save_fn):
     print(f"Model already started training! Resuming from {save_fn}")
     model_load(save_fn)
