@@ -13,7 +13,7 @@ from tqdm import tqdm
 import training.model
 from training.splitcross import SplitCrossEntropyLoss
 
-from training.utils import batchify, get_batch, repackage_hidden, get_slice
+from probing_method.utils import batchify, get_batch
 
 from paths import project_base_path
 
@@ -122,7 +122,7 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
         lr2 = optimizer.param_groups[0]['lr']
         optimizer.param_groups[0]['lr'] = lr2 * seq_len / args.bptt
         model.train()
-        data, targets = get_batch(train_data, epoch_data_index, args, seq_len=seq_len)
+        data, targets = get_batch(train_data, epoch_data_index)
 
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
