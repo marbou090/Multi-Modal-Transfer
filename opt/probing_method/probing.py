@@ -44,6 +44,9 @@ def probing_train(data, pret_model,pret_criterion, seed, save_dir,run_name,start
         torch.cuda.manual_seed(seed)
     train_data, val_data, test_data = data
     model = pret_model.cuda()
+    ##############################
+    model.decoder = torch.nn.Linear(400,3 ).to('cuda:0')
+    #############################
     criterion = pret_criterion.cuda()
     params = list(model.parameters()) + list(criterion.parameters())
     optimizer = torch.optim.AdamW(params)
@@ -76,13 +79,16 @@ def probing_train(data, pret_model,pret_criterion, seed, save_dir,run_name,start
         if epoch == check_epoch:
             print("Reached check epoch, calculating validation loss")
             train_loss_at_epoch = last_train_loss
-            loss_at_epoch = evaluate(model, criterion, val_data, eval_batch_size)
-            test_loss_at_epoch = evaluate(model, criterion, test_data, test_batch_size)
+            loss_at_epoch = evaluate(val_data)
+            test_loss_at_epoch = evaluate(test_data)
             print(f"Loss {loss_at_epoch}, test loss {test_loss_at_epoch}")
+            ######################################
+            break
+            ############################################
 
     embeddings = model.encoder.weight.detach().cpu().numpy()
 
-    test_loss = evaluate(model, criterion, test_data, test_batch_size)
+    test_loss = evaluate(test_data)
 
     return test_loss
 
@@ -90,28 +96,28 @@ def probing_train(data, pret_model,pret_criterion, seed, save_dir,run_name,start
 # Training code
 ###############################################################################
 
-def evaluate(model, criterion, data_source, batch_size=10):
+def evaluate(data_source):
     # Turn on evaluation mode which disables dropout.
-    print('evaluating model')
     model.eval()
-    total_loss = 0
-    hidden = model.init_hidden(batch_size)
-    #print(f'criterion:{criterion}\n data_source:{data_source}')
-    for i in tqdm(range(0, data_source.size(0) - 1, args.bptt)):
-        data, targets = get_batch(data_source, i, args, evaluation=True)
-        print(f'data:{data} targets:{targets}')
-        output, hidden = model(data, hidden)
-        total_loss += len(data) * criterion(model.decoder.weight, model.decoder.bias, output, targets).data
-        hidden = repackage_hidden(hidden)
-    return total_loss.item() / len(data_source)
+    total_loss = 0.
+    with torch.no_grad():
+        for i in range(0, data_source.size(0) - 1, args.bptt):
+            data, targets = get_batch(data_source, i)
+            targets = torch.tensor([1,0,0]).to('cuda:0')
+            data = data.to('cuda:0')
+            output = model(data)
+            output = output.view(-1, 3).T
+            total_loss += len(data) * criterion(output, targets).item()
+    return total_loss / (len(data_source) - 1)
+
 
 def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
           epoch_data_index, valid_time, val_loss_list, scheduler, num_lr_decreases):
     global best_loss, best_model, last_train_loss
+
     model.train()
     total_loss = 0
     start_time = time.time()
-    hidden = model.init_hidden(args.batch_size)
     while epoch_data_index < train_data.size(0) - 1 - 1:
         bptt = args.bptt if np.random.random() < 0.95 else args.bptt / 2.
         # Prevent excessively small or negative sequence lengths
@@ -122,28 +128,31 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
         lr2 = optimizer.param_groups[0]['lr']
         optimizer.param_groups[0]['lr'] = lr2 * seq_len / args.bptt
         model.train()
-        data, targets = get_batch(train_data, epoch_data_index)
+        data, _ = get_batch(train_data, epoch_data_index)
+        targets = torch.tensor([1,0,0]).to('cuda:0')
 
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
-        hidden = repackage_hidden(hidden)
         optimizer.zero_grad()
 
-        output, hidden, rnn_hs, dropped_rnn_hs = model(data, hidden, return_h=True)
-        raw_loss = criterion(model.decoder.weight, model.decoder.bias, output, targets)
-
-        loss = raw_loss
-        # Activiation Regularization
-        if args.alpha: loss = loss + sum(args.alpha * dropped_rnn_h.pow(2).mean() for dropped_rnn_h in dropped_rnn_hs[-1:])
-        # Temporal Activation Regularization (slowness)
-        if args.beta: loss = loss + sum(args.beta * (rnn_h[1:] - rnn_h[:-1]).pow(2).mean() for rnn_h in rnn_hs[-1:])
+        data = data.to('cuda:0')
+        output= model(data)
+        """
+        y_pred = torch.max(output.view(-1, 3), dim=1)
+        correct = 0
+        for i in y_pred.indices:
+            if i == 0:
+                correct+=1
+        print(f"correct num :{correct}\n case size:{len(y_pred.indices)}\n ratio:{correct/len(y_pred.indices)}")
+        """
+        loss = criterion(output.view(-1, 3).T, targets)
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         if args.clip: torch.nn.utils.clip_grad_norm_(params, args.clip)
         optimizer.step()
 
-        total_loss += raw_loss.data
+        total_loss += loss.data
         optimizer.param_groups[0]['lr'] = lr2
         if overall_batch % args.log_interval == 0 and overall_batch > 0:
             cur_loss = total_loss.item() / args.log_interval
@@ -158,7 +167,7 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
 
         if overall_batch % args.valid_interval == 0 and overall_batch > 0:
             elapsed = time.time() - valid_time
-            val_loss = evaluate(model, criterion, val_data, eval_batch_size)
+            val_loss = evaluate( val_data)
             val_loss_list.append(val_loss)
             scheduler.step(val_loss)
             if scheduler.in_cooldown:
@@ -176,7 +185,7 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
                 print(f"New best loss {best_loss}")
                 best_model = model.state_dict()
             ######################################
-            num_lr_decreases=1
+            #num_lr_decreases=1
             ############################################
             valid_time = time.time()
         ###
