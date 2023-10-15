@@ -57,7 +57,7 @@ parser.add_argument('--valid-interval', type=int, default=1000,
 ###
 parser.add_argument('--model', type=str, default='LSTM',
                     help='type of recurrent net (LSTM, QRNN, GRU)')
-parser.add_argument('--num-embs', type=int, default=50000,
+parser.add_argument('--num-embs', type=int, default=20000,
                     help="Number of word embeddings (size of vocab, essentially, but if vocab is smaller some will be unused)")
 parser.add_argument('--emsize', type=int, default=400,
                     help='size of word embeddings')
@@ -101,6 +101,7 @@ parser.add_argument('--when', nargs="+", type=int, default=[-1],
                     help='When (which epochs) to divide the learning rate by 10 - accepts multiple')
 args = parser.parse_args()
 args.tied = True
+args.cuda = True
 #############
 #############
 #############
@@ -200,7 +201,8 @@ optimizer = None
 scheduler = None
 run_data = None
 ntokens = len(corpus.dictionary)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#print(device)
 assert ntokens <= args.num_embs, "Vocab can't be bigger than number of embeddings"
 model = Transformer.TransformerModel(args.num_embs, args.emsize, args.nhead,args.nhid,args.nlayers)
 

@@ -27,8 +27,7 @@ def batchify(data, bsz, args):
 def get_batch(source, i):
     data = source[i, 1:]
     target = source[i, 0]
-    print(f"source:{source}")
-    print(f"data:{data}")
-    print(f"target:{target}")
-    exit()
+    #print(f"source:{source}")
+    #print(f"data:{data}")
+    #print(f"target:{target}")
     return data, target

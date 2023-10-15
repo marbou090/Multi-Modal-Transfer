@@ -5,8 +5,8 @@ import pickle
 import torch
 
 from paths import project_base_path
-from training.utils import batchify, repackage_hidden, get_slice
-from training.probing import probing_train
+from probing_method.utils import batchify
+from probing_method.probing import probing_train
 
 
 parser = argparse.ArgumentParser()
@@ -27,7 +27,7 @@ assert args.probe_task in possible_probetask
 batch_size =80
 
 def run():
-    pretrain_path = os.path.join(project_base_path, "models", "pretrained_models", args.pretrain)
+    pretrain_path = os.path.join(project_base_path, "models", "pretrained_models", "Transformer",args.pretrain)
     pretrain_idx = possible_probetask.index(args.probe_task)
     save_dir = os.path.join(project_base_path, "models", "probes", args.pretrain)
     if not os.path.exists(save_dir):
@@ -35,11 +35,11 @@ def run():
     save_path = os.path.join(save_dir, args.run_name)
     print(f"Will save to {save_path}")
 
-    probing_data_location = os.path.join(project_base_path, "corpora", "pickled_files", f"corpus-{args.probe_task}")
+    probing_data_location = os.path.join(project_base_path, "corpora", "probing_pickled_files", f"corpus-{args.probe_task}")
     corpus = load_corpus(probing_data_location)
-    train_data = batchify(corpus.train, batch_size, args)
-    val_data = batchify(corpus.valid, batch_size, args)
-    test_data = batchify(corpus.test, batch_size, args)
+    train_data = corpus.train
+    val_data = corpus.valid
+    test_data = corpus.test
 
     seed = args.seed*100 + pretrain_idx
     np.random.seed(seed)

@@ -22,3 +22,4 @@ gmd_tokens/
 UD_English-EWT/
 memo.md
 probing_pickled_files/
+*.ipynb
