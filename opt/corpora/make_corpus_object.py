@@ -8,6 +8,7 @@ import numpy as np
 
 import sys
 this_file_path = os.path.join(os.getcwd(), __file__)
+print(this_file_path)
 project_path = os.path.split(os.path.split(this_file_path)[0])[0]
 print(project_path)
 sys.path.insert(0, project_path)

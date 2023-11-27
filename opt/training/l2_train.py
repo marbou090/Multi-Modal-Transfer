@@ -71,18 +71,18 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
 
     if os.path.exists(save_path):
         print(f"Model already fintuned! Resuming from {save_path}")
-        load_data = model_load(save_path)
-        print(load_data)
-        model = load_data.model
+        model, criterion, optimizer, scheduler, run_data = model_load(save_path)
         model.cuda()
         test_loss = evaluate(model, criterion, test_data, test_batch_size)
         print(f'test_loss:{test_loss}')
         l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
         print(f"l1_test_loss:{l1_test_loss}")
 
-        return load_data.val_loss_list, test_loss, last_train_loss, load_data.overall_batch, load_data.epoch, \
-           load_data.loss_at_epoch, load_data.test_loss_at_epoch, load_data.train_loss_at_epoch, \
-           load_data.zero_shot_test, l1_test_loss, load_data.embeddings
+        print(run_data)
+
+        return run_data[4], test_loss, last_train_loss, run_data[5], run_data[0], \
+           run_data[8], run_data[9], run_data[10], \
+           run_data[11], l1_test_loss, run_data[12]
 
     zero_shot_test = evaluate(model, criterion, test_data, test_batch_size)
 
@@ -98,7 +98,7 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
         epoch_batch, epoch_data_index = 0, 0
         epoch += 1
         #########################
-        #num_lr_decreases=1
+        num_lr_decreases=1
         #########################
         if num_lr_decreases >= max_lr_decreases:
             stop_condition_met = True
@@ -115,25 +115,26 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
 
     print(f"Saving model to {save_path} ")
     with open(save_path, 'wb') as f:
-        pickle.dump({'model':model, 
-                    'criterion':criterion,
-                     'optimizer':optimizer, 
-                     'scheduler':scheduler,
-                    'epoch':epoch, 
-                    'num_lr_decreases':num_lr_decreases, 
-                    'lr':lr, 
-                    'best_loss':best_loss, 
-                    'val_loss_list':val_loss_list,
-                     'overall_batch':overall_batch, 
-                     'epoch_batch':epoch_batch, 
-                     'epoch_data_index':epoch_data_index,
-                     'loss_at_epoch':loss_at_epoch,
-                     'test_loss_at_epoch':test_loss_at_epoch,
-                     'train_loss_at_epoch':train_loss_at_epoch,
-                     'zero_shot_test':zero_shot_test,
-                     'embeddings':embeddings,
-                     'last_train_loss':last_train_loss},
+        torch.save([model, 
+                    criterion,
+                    optimizer, 
+                    scheduler,
+                    (epoch, 
+                    num_lr_decreases, 
+                    lr, 
+                    best_loss, 
+                    val_loss_list,
+                    overall_batch, 
+                    epoch_batch, 
+                    epoch_data_index,
+                    loss_at_epoch,
+                    test_loss_at_epoch,
+                    train_loss_at_epoch,
+                    zero_shot_test,
+                    embeddings,
+                    last_train_loss)],
                    f)
+    exit()
     l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
     test_loss = evaluate(model, criterion, test_data, test_batch_size)
     
@@ -146,8 +147,8 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
 
 def model_load(fn):
     with open(fn, 'rb') as f:
-        data= pickle.load(f)
-    return data
+        model, criterion, optimizer, scheduler, run_data = torch.load(f)
+    return model, criterion, optimizer, scheduler, run_data
 
 """
 def model_save(fn, epoch, num_lr_decreases,lr, best_loss, val_loss_list,
@@ -248,8 +249,11 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
                 best_loss = val_loss
                 print(f"New best loss {best_loss}")
                 best_model = model.state_dict()
+                ############################
+                break
+                ############################
             ######################################
-            num_lr_decreases=1
+            #num_lr_decreases=2
             ############################################
             valid_time = time.time()
         ###

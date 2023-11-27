@@ -39,7 +39,7 @@ def run():
     possible_pretrains = \
         ["pt", "ja", "code", "music", "unigram", "random", "es", "en", "ru", \
         "random310", "repetition", "paren", "paren-zipf", "valence", "de", "eu", \
-        "fi", "ro", "tr", "it", "ko", "def","groove","maestro","groove_expanded"]
+        "fi", "ro", "tr", "it", "ko", "def","groove","maestro","groove_expanded", "random-en"]
     #assert args.pretrain in possible_pretrains
 
     pretrain_type = args.pretrain if args.pretrain in ["music", "code"] else "language"
@@ -126,6 +126,7 @@ def load_corpus(data_path, cull_vocab=True, shuffle_vocab=False):
         assert cull_vocab, "Usually don't have unculled shuffled corpora"
         data_path = data_path + "-shuf"
 
+    print(f'load l2 corpus:{data_path}')
     corpus = torch.load(data_path)
     return corpus
 
