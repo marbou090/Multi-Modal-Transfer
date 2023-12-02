@@ -24,3 +24,4 @@ memo.md
 probing_pickled_files/
 *.ipynb
 es/
+SentEval/
