@@ -134,7 +134,6 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
                     embeddings,
                     last_train_loss)],
                    f)
-    exit()
     l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
     test_loss = evaluate(model, criterion, test_data, test_batch_size)
     

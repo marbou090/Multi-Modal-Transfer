@@ -39,7 +39,7 @@ def run():
     possible_pretrains = \
         ["pt", "ja", "code", "music", "unigram", "random", "es", "en", "ru", \
         "random310", "repetition", "paren", "paren-zipf", "valence", "de", "eu", \
-        "fi", "ro", "tr", "it", "ko", "def","groove","maestro","groove_expanded", "random-en"]
+        "fi", "ro", "tr", "it", "ko", "def","groove","maestro","groove_expanded", "random-en","wiki-es"]
     #assert args.pretrain in possible_pretrains
 
     pretrain_type = args.pretrain if args.pretrain in ["music", "code"] else "language"
