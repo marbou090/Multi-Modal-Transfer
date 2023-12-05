@@ -5,17 +5,19 @@ import os
 import json
 import collections
 import time
+from tqdm import tqdm
 
 import torch
 from torch import nn
 
 from paths import project_base_path
-from ptobing_method.probing_model import MultiLaryerProbingModel,LinearProbingModel
 from training.utils import repackage_hidden
+from probing_method.probing_model import MultiLayerProbingModel,LinearProbingModel
+
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--probe-task', type=str, default='BigramShift',
+parser.add_argument('--probe-task', type=str, default='bigram',
                     help='Short name of the probe task')
 parser.add_argument('--probe-model', type=str, default='MLP',
                     help='type of probe model (MLP, Linear)')
@@ -55,54 +57,90 @@ def model_save(fn, model):
     with open(fn, 'wb') as f:
         torch.save([model], f)
 
-def probe_data_load(fn):    
+def probe_data_load(probe_data, max_length):
+    nbatch = probe_data.size(0) // max_length
+    probe_data = probe_data.narrow(0, 0, nbatch * max_length)
+    probe_data = probe_data.view(max_length, -1).t().contiguous()
+    return probe_data
+
+def cul_sentence_max_length(fn):
+    max_length = 0
+    with open(fn, 'r') as f:
+        for line in f:
+            sentences = line.split('\t')
+            words = sentences[2].split() + ['<eos>']
+            if max_length < len(words):
+                max_length = len(words)
+    return max_length
+
+def create_probe_data(fn):    
+    return train_X, test_X, val_X
+
+def probe_label_load(fn, clip_size):    
     train_data = []
     val_data = []
     test_data = []
+    classes = {}
+    num_classes = 0
+    count = 0
     with open(fn, 'r') as f:
         for line in f:
-            sentences = line.split(' ')
-            if sentences[0] == ("tr"):
-                train_data.append(sentences[2])
-            elif sentences[0] == ("va"):
-                val_data.append(sentences[2])
-            elif sentences[0] == ("te"):
-                test_data.append(sentences[2])
-    return train_data, val_data, test_data
-
-def probe_label_load(fn):    
-    train_data = []
-    val_data = []
-    test_data = []
+            sentences = line.split('\t')
+            if not sentences[1] in classes:
+                classes[sentences[1]] = num_classes
+                num_classes = num_classes + 1
     with open(fn, 'r') as f:
+        index = 0
         for line in f:
-            sentences = line.split(' ')
-            if sentences[0] == ("tr"):
-                train_data.append(sentences[1])
-            elif sentences[0] == ("va"):
-                val_data.append(sentences[1])
-            elif sentences[0] == ("te"):
-                test_data.append(sentences[1])
-    return train_data, val_data, test_data
+            sentences = line.split('\t')
+            if sentences[0] == ("tr") and len(train_data) < clip_size:
+                count += 1
+                train_data.append(classes[sentences[1]])
+            elif sentences[0] == ("va") and len(val_data) < clip_size:
+                val_data.append(classes[sentences[1]])
+            elif sentences[0] == ("te") and len(test_data) < clip_size:
+                test_data.append(classes[sentences[1]])
+            index += 1
+    return torch.tensor(train_data), torch.tensor(val_data), torch.tensor(test_data), num_classes
 
-def model_representation(model, data, batch_size=80):
-    representations = []
-    for line in data:
-        hidden = model.init_hidden(batch_size)
+def model_representation(model, train_data, clip_size, batch_size=80):
+    hidden = model.init_hidden(batch_size)
+    index = 0
+    bptt = batch_size
+
+    for index in tqdm(range(0, train_data.size(0), bptt)):
+        if batch_size > train_data.size(0)-index:
+            break
+        if index >= clip_size:
+            break        
+        data = train_data[index:index+bptt]
         hidden = repackage_hidden(hidden)
-        representation, _, _, _ = model(line, hidden, return_h=True)
-        representations.append(representation)
+        if index == 0:
+            representations, _, _, _ = model(data, hidden, return_h=True)#.view(bptt, -1)
+            representations = representations.view(bptt, -1)
+        else:
+            representation, _, _, _ = model(data, hidden, return_h=True)
+            representations = torch.cat((representations,representation.view(bptt, -1)), dim = 0)
     return representations
+
+#####Model
+def load_pret_model(fn):
+    with open(fn, 'rb') as f:
+        model, _, _, _, _ = torch.load(f)
+    return model
+
 
 #####Train
 def train(model, criterion, data_X, data_Y):
     model.train()
     optimizer.zero_grad()
     predictions = model(data_X)
+    print(predictions[:10])
+    print(predictions.size())
     loss = criterion(predictions, data_Y)
-    index = index + 1
     loss.backward()
     optimizer.step()
+
     """
         if epoch_batch % args.log_interval == 0 and epoch_batch > 0:
             cur_loss = total_loss.item() / args.log_interval
@@ -112,7 +150,8 @@ def train(model, criterion, data_X, data_Y):
                 epoch, epoch_batch,  num_data // len(data_X), optimizer.param_groups[0]['lr'],
                 elapsed * 1000 / args.log_interval, cur_loss))
             total_loss = 0
-            start_time = time.time()
+            start_titorch.load(fn)
+            me = time.time()
         
         if overall_batch % args.valid_interval == 0 and overall_batch > 0:
             val_loss = evaluate(val_data, eval_batch_size)
@@ -133,27 +172,42 @@ def train(model, criterion, data_X, data_Y):
     return loss
 
 ###############################################################################
-# Load data
-###############################################################################
+clip_size = 2000
 
+# Load dataprobe_task
+probe_path = os.path.join(project_base_path, 'corpora', 'SentEval','bigram_shift.txt')
+train_Y, val_Y, test_Y, num_classe = probe_label_load(probe_path, clip_size)
+print(f'num class : {num_classe}')
+print(f"train_Y size : {len(train_Y)} | val_Y size : {len(val_Y)} | test_Y size : {len(test_Y)}")
 
-pretraining_path = os.path.join(project_base_path, "models", "l2_results", "RNN", args.pretrain_data,args.pretrain_model)
-pret_model, _, _, _, run_data = model_load(pretraining_path)
+batch_size = cul_sentence_max_length(probe_path)
+batch_size = 80
+corpus_path = os.path.join(project_base_path, "corpora","probing_pickled_files",'corpus-'+args.probe_task)
+corpus = torch.load(corpus_path)
+train_corpus = probe_data_load(corpus.train, batch_size)
+val_corpus = probe_data_load(corpus.valid, batch_size)
+test_corpus = probe_data_load(corpus.test, batch_size)
+print(f'data length : {len(corpus.train + len(corpus.valid)+ len(corpus.test))}')
+print(f'train size : {train_corpus.size()}\n validation size : {val_corpus.size()}\n test size : {test_corpus.size()}')
+print(f'train corpus size : {len(corpus.train)}\n validation corpus size : {len(corpus.valid)}\n test corpus size : {len(corpus.test)}')
 
-probe_path = os.path.join(project_base_path, "corpora","pickled_files",args.probe_task)
-train_data, val_data, test_data = probe_data_load(probe_path)
-train_Y, val_Y, test_Y = probe_label_load(probe_path)
-num_classes = collections.Counter(train_Y)
 
 print("Generating Probe Task Data Set")
 #学習済みに文章いれて内部表現を保存していく
-train_X = model_representation(pret_model, train_data)
-val_X = model_representation(pret_model, val_data)
-test_X = model_representation(pret_model, test_data)
+print(train_corpus[0])
+pret_model = load_pret_model(os.path.join(project_base_path, "models", "l2_results", "RNN", args.pretrain_data, args.pretrain_model+'-finetune.pickle'))
+pret_model = pret_model.to('cpu')
 
+
+train_X = model_representation(pret_model, train_corpus, clip_size)
+print(train_X.size(), len(train_Y))
+print(f" Train Representation Done")
+val_X = model_representation(pret_model, val_corpus, clip_size)
+print(f"Validation Representation Done")
+test_X = model_representation(pret_model, test_corpus, clip_size)
+print(f"Test Representation : Done")
 
 print("Dataset Ready!")
-print(f"Train Original Text : {train_data[0]}\n Representation : {train_X[0]}\n Label : {train_Y[0]}")
 
 ###############################################################################
 # Build the model
@@ -163,7 +217,9 @@ print(f"Train Original Text : {train_data[0]}\n Representation : {train_X[0]}\n 
 if args.activation == 'None':
     activation = None
 input_dim = len(train_X[0])
-model = LinearProbingModel(input_dim, num_classes, activation)
+hidden_size = len(train_X)
+print(f'input dim : {input_dim}')
+model = LinearProbingModel(input_dim, hidden_size, (num_classe), activation)
 
 #Setting optimizer and scheduler
 criterion = nn.CrossEntropyLoss()
@@ -174,7 +230,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=args.
 # Training code
 ###############################################################################
 
-train_loss = train(model, criterion,train_X, train_Y)
+train_loss = train(model, criterion,train_X, train_Y[:2080])
 print(f'train data loss : {train_loss}')
 
 test_predicition = model(test_X)

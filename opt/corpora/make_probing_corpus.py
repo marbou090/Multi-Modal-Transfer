@@ -18,19 +18,25 @@ from corpora.probing_data import Corpus
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', type=str, help="Path of where the data is, minus the train/val/test part of the filename")
 parser.add_argument('--name', type=str, help="The shorthand name for this corpus, such as 'unigram' or 'pt'")
+parser.add_argument('--batch-condition', type=str, default='batch', help='学習時のバッチサイズに合わせて<unk>埋めするか、文の最大長に合わせるか')
+args = parser.parse_args()
 
 def main(args):
     corpus = Corpus()
-    corpus.train = tokenize(corpus, args.path + 'train')
-    corpus.valid = tokenize(corpus, args.path + 'validation')
-    corpus.test = tokenize(corpus, args.path + 'test')
+    corpus.train = tokenize(corpus, args.path , 'train', args.batch_condition)
+    corpus.valid = tokenize(corpus, args.path, 'validation', args.batch_condition)
+    corpus.test = tokenize(corpus, args.path, 'test', args.batch_condition)
     torch.save(corpus, os.path.join(project_path, "corpora", "probing_pickled_files", f"corpus-{args.name}"))
     print("Finished and saved!")
 
-def tokenize(corpus, path):
-    return probing_tokenize(corpus, path)
+def tokenize(corpus, path, option, batch):
+    if batch == 'batch':
+        batch_size = 80
+        return probing_tokenize_batch(corpus, path, option, batch_size)
+    else:
+        return probing_tokenize(corpus, path, option)
 
-def probing_tokenize(corpus, path):
+def probing_tokenize(corpus, path, option):
     """Tokenizes a text file."""
     print(path)
     assert os.path.exists(path)
@@ -38,53 +44,123 @@ def probing_tokenize(corpus, path):
     # add target
     max_line_length = 0
     lines_length = 0 #全部で何行あるのか
-    with open(path, 'r') as f:
-        tokens = 0
-        for line in f:
-            lines_length +=1
-            word = re.search(r'[A-Z][a-z]+',line)
-            corpus.dictionary.add_word(word.group())
+
+    mode = ''
+    if option =='train':
+        mode = 'tr'
+    elif option == 'validation':
+        mode = 'va'
+    elif option == 'test':
+        mode = 'te'
     
-
-    # add special token
     corpus.dictionary.add_word("<unk>")
-    tokens=4
 
+    test_sentence = ''
     #add word
-    with open(path, 'r') as f:       
+    with open(path, 'r') as f:      
+        tokens = 0 
         for line in f:
-            line = re.sub('\A[A-Z][a-z]+','',line)
-            words = line.split() + ['<eos>']
+            sentences = line.split('\t')
+            words = sentences[2].split() + ['<eos>']
             if max_line_length < len(words):
                 max_line_length = len(words)
-            tokens += len(words)
-            for word in words:
-                corpus.dictionary.add_word(word)
+            if sentences[0] == mode:
+                if len(test_sentence)<1:
+                    test_sentence = sentences
+                tokens += len(words)
+                for word in words:
+                    corpus.dictionary.add_word(word)
 
-   
+
     # Tokenize file content
     with open(path, 'r') as f:
-        ids = torch.LongTensor(lines_length, max_line_length+1)
-        print(ids.size())
-        number_line=0 #いま何行目か
-
+        ids = torch.LongTensor(tokens)
+        token = 0
         for line in f:
-            words = line.split() + ['<eos>']
+            sentences = line.split('\t')
+            words = sentences[2].split() + ['<eos>']
             if len(words)<max_line_length:
                 while len(words) >= max_line_length:
                     words.append('<unk>')
-            
-            for i, word in enumerate(words):
-                ids[number_line][i] = corpus.dictionary.get_index(word)
-            number_line+=1
+            if sentences[0] == mode:
+                for word in words:
+                    ids[token] = corpus.dictionary.get_index(word)
+                    token += 1
+
     
-    for target in ["Acc", "Gen","Nom"]:
-            print(f'target:{target}')
-            print(f'token:{corpus.dictionary.get_index(target)}')
-            print('-'*89)
+    print(f"max length : {max_line_length}")
+    print('-'*89)
+    print(f'{option} dataset ')
+    print(f'target:{test_sentence[1]}')
+    print(f'original sentence:{test_sentence[2]}')
+    token_text = ''
+    for word in test_sentence[2]:
+        token_text = token_text + str(corpus.dictionary.get_index(word)) + ' '
+    print(f'token sentence:{token_text}')
     return ids
 
+def probing_tokenize_batch(corpus, path, option, batchsize):
+    """Tokenizes a text file."""
+    print(path)
+    assert os.path.exists(path)
+    # Add words to the dictionary
+    # add target
+    lines_length = 0 #全部で何行あるのか
+
+    mode = ''
+    if option =='train':
+        mode = 'tr'
+    elif option == 'validation':
+        mode = 'va'
+    elif option == 'test':
+        mode = 'te'
+    
+    corpus.dictionary.add_word("<unk>")
+
+    test_sentence = ''
+    #add word
+    with open(path, 'r') as f:      
+        tokens = 0 
+        for line in f:
+            sentences = line.split('\t')
+            words = sentences[2].split() + ['<eos>']
+            if sentences[0] == mode:
+                if len(test_sentence)<1:
+                    test_sentence = sentences
+                tokens += len(words)
+                for word in words:
+                    corpus.dictionary.add_word(word)
+
+
+    # Tokenize file content
+    with open(path, 'r') as f:
+        ids = torch.LongTensor(tokens)
+        token = 0
+        for line in f:
+            sentences = line.split('\t')
+            words = sentences[2].split() + ['<eos>']
+            if len(words)<batchsize:
+                while len(words) >= batchsize:
+                    words.append('<unk>')
+            if sentences[0] == mode:
+                for word in words:
+                    ids[token] = corpus.dictionary.get_index(word)
+                    token += 1
+
+    
+    print(f"batch size : {batchsize}")
+    print('-'*89)
+    print(f'{option} dataset ')
+    print(f'target:{test_sentence[1]}')
+    print(f'original sentence:{test_sentence[2]}')
+    token_text = ''
+    for word in test_sentence[2]:
+        token_text = token_text + str(corpus.dictionary.get_index(word)) + ' '
+    print(f'token sentence:{token_text}')
+    return ids
+
+
 if __name__ == "__main__":
-    args = parser.parse_args()
+    
     print(args)
     main(args)
