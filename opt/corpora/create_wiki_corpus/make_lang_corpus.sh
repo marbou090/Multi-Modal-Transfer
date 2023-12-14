@@ -5,9 +5,9 @@ echo "This whole script can take hours, make sure that's ok!"
 lang=$1
 
 mkdir $lang ; cd $lang
-#echo "Getting and unzipping wikipedia dumps for $lang"
+echo "Getting and unzipping wikipedia dumps for $lang"
 #curl -O https://dumps.wikimedia.org/"$lang"wiki/latest/"$lang"wiki-latest-pages-articles.xml.bz2
-bunzip2 "$lang"wiki-latest-pages-articles.xml.bz2
+#bunzip2 "$lang"wiki-latest-pages-articles.xml.bz2
 cd ..
 
 # Download the trained language models you want for the language, and save them

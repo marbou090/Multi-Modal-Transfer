@@ -121,6 +121,7 @@ if torch.cuda.is_available():
     else:
         torch.cuda.manual_seed(seed)
 print(f"Set the sed to {seed}")
+args.cuda = False
 
 ###############################################################################
 # Load data
@@ -160,7 +161,6 @@ fn_cull = os.path.join(project_base_path, "corpora", "pickled_files",
 fn_shuffle = os.path.join(project_base_path, "corpora", "pickled_files", 
      f"corpus-{args.data}.cull-shuf")
 loaded_file = False
-vocab_culled = False
 if args.corpus_change == "shuffle":
     assert args.cull_vocab, "We only shuffle the culled corpora"
     assert os.path.exists(fn_shuffle), \
@@ -196,6 +196,7 @@ optimizer = None
 scheduler = None
 run_data = None
 ntokens = len(corpus.dictionary)
+print(ntokens)
 assert ntokens <= args.num_embs, "Vocab can't be bigger than number of embeddings"
 model = model.RNNModel(args.model, args.num_embs, args.emsize, args.nhid, args.nlayers, args.dropout, args.dropouth, args.dropouti, args.dropoute, args.wdrop, args.tied)
 ###
@@ -203,7 +204,6 @@ save_path = os.path.join(project_base_path, "models", "pretrained_models", args.
 if os.path.exists(save_fn):
     print(f"Model already started training! Resuming from {save_fn}")
     model_load(save_fn)
-    model.cuda()
 ###
 if not criterion:
     splits = []
@@ -254,6 +254,7 @@ def train():
     ntokens = len(corpus.dictionary)
     hidden = model.init_hidden(args.batch_size)
     while epoch_data_index < train_data.size(0) - 1 - 1:
+
         bptt = args.bptt if np.random.random() < 0.95 else args.bptt / 2.
         # Prevent excessively small or negative sequence lengths
         seq_len = max(5, int(np.random.normal(bptt, 5)))

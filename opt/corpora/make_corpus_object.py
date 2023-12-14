@@ -82,7 +82,7 @@ def music_tokenize(corpus, path):
     for f in files:
         arr = np.load(f)
         num_tokens += len(arr)
-        print(f"This file has length {len(arr)}")
+        #print(f"This file has length {len(arr)}")
         for token in arr:
             corpus.dictionary.add_word(str(token))
 

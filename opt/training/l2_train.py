@@ -45,8 +45,8 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
     train_data, val_data, test_data = data
-    model = pret_model.cuda()
-    criterion = pret_criterion.cuda()
+    model = pret_model
+    criterion = pret_criterion
     params = list(model.parameters()) + list(criterion.parameters())
     optimizer = torch.optim.SGD(params, lr=start_lr, weight_decay=args.wdecay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -72,20 +72,19 @@ def l2_train(data, pret_model, pret_criterion, l1_test, seed,save_dir, run_name,
     if os.path.exists(save_path):
         print(f"Model already fintuned! Resuming from {save_path}")
         model, criterion, optimizer, scheduler, run_data = model_load(save_path)
-        model.cuda()
-        test_loss = evaluate(model, criterion, test_data, test_batch_size)
-        print(f'test_loss:{test_loss}')
+        #test_loss = evaluate(model, criterion, test_data, test_batch_size)
+        #print(f'test_loss:{test_loss}')
         l1_test_loss = evaluate(model, criterion, l1_test, test_batch_size)
         print(f"l1_test_loss:{l1_test_loss}")
 
         print(run_data)
 
-        return run_data[4], test_loss, last_train_loss, run_data[5], run_data[0], \
-           run_data[8], run_data[9], run_data[10], \
-           run_data[11], l1_test_loss, run_data[12]
+        #return run_data[4], test_loss, last_train_loss, run_data[5], run_data[0], \
+        #   run_data[8], run_data[9], run_data[10], \
+        #   run_data[11], l1_test_loss, run_data[12]
 
     zero_shot_test = evaluate(model, criterion, test_data, test_batch_size)
-
+    print(f'test_loss:{zero_shot_test}')
     ##########################################################################
     #fintuning
     ##########################################################################
@@ -248,9 +247,6 @@ def train(model, criterion, train_data, val_data, overall_batch, epoch_batch,
                 best_loss = val_loss
                 print(f"New best loss {best_loss}")
                 best_model = model.state_dict()
-                ############################
-                break
-                ############################
             ######################################
             #num_lr_decreases=2
             ############################################

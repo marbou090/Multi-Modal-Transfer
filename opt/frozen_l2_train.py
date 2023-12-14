@@ -18,7 +18,7 @@ parser.add_argument('--trials', nargs="+", type=int, default=[0, 5],
 parser.add_argument('--seed', type=int, default=4, help="Seed will be args.seed*100 + the pretrain_index")
 parser.add_argument('--finetuneFile', type=str,help="Which L2 corpus")
 args = parser.parse_args()
-args.cuda = True
+args.cuda = False
 print(args)
 
 torch.backends.cudnn.enabled = False
@@ -37,7 +37,7 @@ def run():
     # Need to update this list with every experiment so that each one is
     # associated with an index for seed purposes.
     possible_pretrains = \
-        ["pt", "ja", "code", "music", "unigram", "random", "es", "en", "ru", \
+        ["maestro2","pt", "ja", "code", "music", "unigram", "random", "es", "en", "ru", \
         "random310", "repetition", "paren", "paren-zipf", "valence", "de", "eu", \
         "fi", "ro", "tr", "it", "ko", "def","groove","maestro","groove_expanded", "random-en","wiki-es"]
     #assert args.pretrain in possible_pretrains
@@ -53,13 +53,13 @@ def run():
 
     l2_data_type = args.finetuneType if args.finetuneType in ["music", "code"] else "language"
     l2_data_location = os.path.join(project_base_path, "corpora", "pickled_files", f"corpus-{args.finetuneFile}")
-    corpus = load_corpus(l2_data_location, l2_data_type, shuffle_vocab=False)
+    corpus = load_corpus(l2_data_location, shuffle_vocab=False)
     train_data = batchify(corpus.train, batch_size, args)
     val_data = batchify(corpus.valid, eval_batch_size, args)
     test_data = batchify(corpus.test, test_batch_size, args)
 
     l1_data_location = os.path.join(project_base_path, "corpora", "pickled_files", f"corpus-{args.pretrain}")
-    l1_corpus = load_corpus(l1_data_location, pretrain_type)
+    l1_corpus = load_corpus(l1_data_location)
     l1_test = batchify(l1_corpus.test, test_batch_size, args)
 
     if os.path.exists(save_path):
@@ -77,8 +77,8 @@ def run():
     np.random.seed(seed)
     for trial in range(args.trials[0], args.trials[1]):
         ########################################
-        notes = (f'l2train-{args.pretrain}-{args.run_name}-trial-{trial}')
-        wandb.init(project='TILT Framework',notes=notes,config=args)
+        #notes = (f'l2train-{args.pretrain}-{args.run_name}-trial-{trial}')
+        #wandb.init(project='TILT Framework',notes=notes,config=args)
         ########################################
 
         print(f"Starting {args.pretrain}, trial {trial}")
@@ -108,18 +108,18 @@ def run():
         results["l1_test"].append(l1_test_loss)
         results["embeddings"].append(embeddings)
         ##############################################################
-        wandb.log({
-            "val_loss_list":val_loss_list,
-            "val_at_convergence":val_loss_list[-1],
-            "test_at_convergence":test_loss,
-            "train_at_convergence":train_loss,
-            "l1_test":l1_test_loss
-        })
-        wandb.finish()
+        #wandb.log({
+        #    "val_loss_list":val_loss_list,
+        #    "val_at_convergence":val_loss_list[-1],
+        #    "test_at_convergence":test_loss,
+        #    "train_at_convergence":train_loss,
+        #    "l1_test":l1_test_loss
+        #})
+        #wandb.finish()
         ###############################################################
         pickle.dump(results, open(save_path, "wb"))
 
-def load_corpus(data_path, cull_vocab=True, shuffle_vocab=False):
+def load_corpus(data_path, cull_vocab=False, shuffle_vocab=False):
     if cull_vocab:
         data_path = data_path + ".cull"
     if shuffle_vocab:

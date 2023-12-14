@@ -3,10 +3,10 @@ from csv import DictReader
 import os
 
 split_to_midi_fps = defaultdict(list)
-with open('corpora/maestro-v3.0.0/maestro-v3.0.0.csv', 'r') as f:
+with open('corpora/maestro-v2.0.0/maestro-v2.0.0.csv', 'r') as f:
   reader = DictReader(f)
   for r in reader:
-    split_to_midi_fps[r['split']].append(os.path.join('corpora/maestro-v3.0.0', r['midi_filename']))
+    split_to_midi_fps[r['split']].append(os.path.join('corpora/maestro-v2.0.0', r['midi_filename']))
 
 import tensorflow.compat.v1 as tf
 tf.to_float = lambda x: tf.cast(x, tf.float32)

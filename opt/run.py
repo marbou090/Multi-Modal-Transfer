@@ -2,6 +2,7 @@
 import argparse
 import numpy as np
 import os
+import csv
 import json
 import collections
 import time
@@ -21,7 +22,7 @@ parser.add_argument('--probe-task', type=str, default='bigram',
                     help='Short name of the probe task')
 parser.add_argument('--probe-model', type=str, default='MLP',
                     help='type of probe model (MLP, Linear)')
-parser.add_argument('--pretrain-data', type=str, default='wiki-es',
+parser.add_argument('--pretrain-data', type=str, default='es',
                     help='short name of the corpus')
 parser.add_argument('--pretrain-model', type=str, default='last_run',
                     help='what name is the save file for using run')
@@ -201,6 +202,8 @@ pret_model = pret_model.to('cpu')
 
 train_X = model_representation(pret_model, train_corpus, clip_size)
 print(train_X.size(), len(train_Y))
+
+
 print(f" Train Representation Done")
 val_X = model_representation(pret_model, val_corpus, clip_size)
 print(f"Validation Representation Done")
@@ -231,8 +234,14 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=args.
 ###############################################################################
 
 train_loss = train(model, criterion,train_X, train_Y[:2080])
+data_path = os.path.join(project_base_path, "corpora","probing_pickled_files","traindata-"+args.pretrain_data+"-"+args.probe_task+".csv")
+with open(data_path, 'w', newline='') as f:
+    writer = csv.writer(f)
+    for data in zip(train_X, train_Y[:2080]):
+        data_x = np.append(data[0].detach().numpy().copy(),data[1].detach().numpy().copy())
+        writer.writerow(data_x)
 print(f'train data loss : {train_loss}')
 
-test_predicition = model(test_X)
-test_loss = criterion(test_predicition, test_Y)
-print(f"test data loss : {test_loss}")
+#test_predicition = model(test_X)
+#test_loss = criterion(test_predicition, test_Y)
+#print(f"test data loss : {test_loss}")
